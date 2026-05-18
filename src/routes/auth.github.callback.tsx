@@ -10,7 +10,7 @@ export const Route = createFileRoute('/auth/github/callback')({
   }),
   beforeLoad: async ({ search }) => {
     if (!search.code || !search.state) {
-      throw redirect({ to: '/', search: { authError: 'missing_callback_params' } })
+      throw redirect({ to: '/', search: { authError: 'missing_callback_params', redirectTo: undefined } })
     }
 
     let result: Awaited<ReturnType<typeof completeGitHubAuthorization>>
@@ -23,7 +23,7 @@ export const Route = createFileRoute('/auth/github/callback')({
         },
       })
     } catch (error) {
-      throw redirect({ to: '/', search: getAuthErrorSearch(error) })
+      throw redirect({ to: '/', search: { ...getAuthErrorSearch(error), redirectTo: undefined } })
     }
 
     throw redirect({ href: result.redirectTo })

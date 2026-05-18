@@ -6,12 +6,14 @@ import { HomeScene } from '@/components/home/home-scene'
 import { ImmersiveShell } from '@/components/immersive-shell'
 import { getAuthErrorMessage } from '@/features/auth/errors'
 import { optionalSessionQueryOptions } from '@/features/auth/session-query'
+import { sanitizeRedirectTo } from '@/lib/redirect'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/')({
   validateSearch: (search) => ({
     authError: typeof search.authError === 'string' ? search.authError : undefined,
+    redirectTo: typeof search.redirectTo === 'string' ? sanitizeRedirectTo(search.redirectTo) : undefined,
   }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(optionalSessionQueryOptions())
@@ -20,7 +22,8 @@ export const Route = createFileRoute('/')({
 })
 
 function Home() {
-  const { authError } = Route.useSearch()
+  const { authError, redirectTo } = Route.useSearch()
+  const nextDestination = redirectTo ?? '/groups'
   const authErrorMessage = getAuthErrorMessage(authError)
   const { data: session } = useSuspenseQuery(optionalSessionQueryOptions())
 
@@ -40,7 +43,7 @@ function Home() {
             <CardContent className="flex flex-col items-center gap-4 px-6 pb-8 sm:px-10 sm:pb-10">
               {session ? (
                 <>
-                  <Button size="lg" render={<Link to="/groups" />}>
+                  <Button size="lg" render={<Link to={nextDestination} />}>
                     Open your groups
                     <ArrowRightIcon data-icon="inline-end" />
                   </Button>
@@ -51,7 +54,7 @@ function Home() {
               ) : (
                   <Button
                     size="lg"
-                    render={<Link to="/connect" search={{ redirectTo: '/groups' }} preload={false} />}
+                    render={<Link to="/connect" search={{ redirectTo: nextDestination }} preload={false} />}
                   >
                   Continue with GitHub
                   <ArrowRightIcon data-icon="inline-end" />

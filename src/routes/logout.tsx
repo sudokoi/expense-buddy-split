@@ -5,7 +5,7 @@ import { logoutGitHubSession } from '@/features/auth/github.functions'
 export const Route = createFileRoute('/logout')({
   beforeLoad: async () => {
     await logoutGitHubSession()
-    throw redirect({ to: '/', search: { authError: undefined } })
+    throw redirect({ to: '/', search: { authError: undefined, redirectTo: undefined } })
   },
   component: LogoutRoute,
 })

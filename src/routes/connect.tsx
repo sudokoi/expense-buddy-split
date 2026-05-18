@@ -14,7 +14,7 @@ export const Route = createFileRoute('/connect')({
       },
     })
 
-    throw redirect({ to: '/', search: { authError: undefined } })
+    throw redirect({ to: '/', search: { authError: undefined, redirectTo: undefined } })
   },
   component: ConnectRoute,
 })

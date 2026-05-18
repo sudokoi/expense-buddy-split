@@ -64,7 +64,6 @@ export const completeGitHubAuthorization = createServerFn({ method: 'GET' })
 
     return {
       redirectTo: oauthState.redirectTo,
-      session: session.data,
     }
   })
 

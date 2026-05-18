@@ -1,11 +1,15 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 
+import { getAuthenticatedSession } from '@/features/auth/github.functions'
+
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: ({ context, location }) => {
-    if (!context.auth.isAuthenticated) {
+  beforeLoad: async ({ location }) => {
+    try {
+      await getAuthenticatedSession()
+    } catch {
       throw redirect({
-        to: '/connect',
-        search: { redirectTo: location.href },
+        to: '/',
+        search: { authError: undefined, redirectTo: location.href },
       })
     }
   },

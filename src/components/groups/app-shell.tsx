@@ -20,7 +20,7 @@ export function AppShell({ children, title, description, actions, contentClassNa
           <Link to="/groups" className="transition-colors hover:text-foreground">
             Groups
           </Link>
-          <Link to="/" search={{ authError: undefined }} className="transition-colors hover:text-foreground">
+          <Link to="/" search={{ authError: undefined, redirectTo: undefined }} className="transition-colors hover:text-foreground">
             Home
           </Link>
           <Link to="/logout" className="transition-colors hover:text-foreground">
