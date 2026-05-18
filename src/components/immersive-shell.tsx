@@ -8,7 +8,7 @@ interface ImmersiveShellProps {
   className?: string
   contentClassName?: string
   surface?: 'light' | 'immersive'
-  navigation?: ReactNode
+  navigation?: ReactNode | null
 }
 
 export function ImmersiveShell({
@@ -44,7 +44,7 @@ export function ImmersiveShell({
               </div>
             </div>
 
-            {navigation ? (
+            {navigation !== undefined ? (
               <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">{navigation}</nav>
             ) : (
               <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
