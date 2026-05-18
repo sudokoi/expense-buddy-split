@@ -6,13 +6,20 @@ import {
   createGroupForUser,
   createInviteForOwner,
   createSettlementForUser,
+  deleteExpenseForUser,
+  deleteSettlementForUser,
   findGroupAccessBySlug,
   getDashboardForUser,
   getGroupDetailForUser,
   getInviteForUser,
   joinGroupViaInvite,
   renameGroupForOwner,
+  revokeInviteForOwner,
   requirePersistedUserByGitHubId,
+  removeMemberForOwner,
+  updateExpenseForUser,
+  updateMemberRoleForOwner,
+  updateSettlementForUser,
 } from '@/features/groups/group-repository'
 import { requireAuthenticatedSessionMiddleware } from '@/server/auth-middleware'
 
@@ -57,6 +64,11 @@ const createInviteSchema = z.object({
   maxUses: z.number().int().min(1).max(500).nullable().optional(),
 })
 
+const revokeInviteSchema = z.object({
+  groupId: z.string().min(1),
+  inviteId: z.string().min(1),
+})
+
 const createExpenseSchema = z.object({
   groupId: z.string().min(1),
   title: z.string().min(1),
@@ -77,6 +89,35 @@ const createSettlementSchema = z.object({
   amount: z.string().min(1),
   note: z.string().optional(),
   occurredOn: z.string().optional(),
+})
+
+const updateExpenseSchema = createExpenseSchema.extend({
+  expenseId: z.string().min(1),
+})
+
+const deleteExpenseSchema = z.object({
+  groupId: z.string().min(1),
+  expenseId: z.string().min(1),
+})
+
+const updateSettlementSchema = createSettlementSchema.extend({
+  settlementId: z.string().min(1),
+})
+
+const deleteSettlementSchema = z.object({
+  groupId: z.string().min(1),
+  settlementId: z.string().min(1),
+})
+
+const updateMemberRoleSchema = z.object({
+  groupId: z.string().min(1),
+  memberUserId: z.string().min(1),
+  role: z.enum(['owner', 'member']),
+})
+
+const removeMemberSchema = z.object({
+  groupId: z.string().min(1),
+  memberUserId: z.string().min(1),
 })
 
 export const getGroupsDashboard = createServerFn({ method: 'GET' })
@@ -127,6 +168,7 @@ export const getGroupBySlug = createServerFn({ method: 'GET' })
       kind: 'group' as const,
       currentSlug: access.currentSlug,
       redirectedFromSlug: access.redirectedFromSlug,
+      currentUserId: user.id,
       group: detail,
     }
   })
@@ -137,6 +179,15 @@ export const createGroupInvite = createServerFn({ method: 'POST' })
   .handler(async ({ context, data }) => {
     const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
     return createInviteForOwner(user.id, data)
+  })
+
+export const revokeGroupInvite = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(revokeInviteSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await revokeInviteForOwner(user.id, data)
+    return { ok: true }
   })
 
 export const getInvitePreview = createServerFn({ method: 'GET' })
@@ -164,12 +215,66 @@ export const createExpense = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+export const updateExpense = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(updateExpenseSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await updateExpenseForUser(user.id, data)
+    return { ok: true }
+  })
+
+export const deleteExpense = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(deleteExpenseSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await deleteExpenseForUser(user.id, data)
+    return { ok: true }
+  })
+
 export const createSettlement = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(createSettlementSchema)
   .handler(async ({ context, data }) => {
     const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
     await createSettlementForUser(user.id, data)
+    return { ok: true }
+  })
+
+export const updateSettlement = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(updateSettlementSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await updateSettlementForUser(user.id, data)
+    return { ok: true }
+  })
+
+export const deleteSettlement = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(deleteSettlementSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await deleteSettlementForUser(user.id, data)
+    return { ok: true }
+  })
+
+export const updateMemberRole = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(updateMemberRoleSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await updateMemberRoleForOwner(user.id, data)
+    return { ok: true }
+  })
+
+export const removeGroupMember = createServerFn({ method: 'POST' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(removeMemberSchema)
+  .handler(async ({ context, data }) => {
+    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    await removeMemberForOwner(user.id, data)
     return { ok: true }
   })
 

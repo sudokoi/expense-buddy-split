@@ -72,6 +72,7 @@ The current persistence slice adds:
 - Drizzle schema for users, groups, memberships, slug history, and invites
 - libSQL/Turso database client wiring
 - GitHub user upsert on successful authentication
+- HTTP-based Turso client usage so remote deployments do not depend on local native SQLite binaries
 
 ## Environment Variables
 
@@ -102,6 +103,8 @@ Next slices will add:
 ## Deployment
 
 This app currently uses Nitro as the deployment adapter.
+
+For remote Turso deployments, the app uses the HTTP libSQL client path instead of the native sqlite transport. That keeps Vercel/Linux deployments from depending on the macOS-native `libsql` binary traced during local builds.
 
 ```bash
 pnpm build

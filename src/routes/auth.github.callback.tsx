@@ -13,18 +13,20 @@ export const Route = createFileRoute('/auth/github/callback')({
       throw redirect({ to: '/', search: { authError: 'missing_callback_params' } })
     }
 
+    let result: Awaited<ReturnType<typeof completeGitHubAuthorization>>
+
     try {
-      const result = await completeGitHubAuthorization({
+      result = await completeGitHubAuthorization({
         data: {
           code: search.code,
           state: search.state,
         },
       })
-
-      throw redirect({ href: result.redirectTo })
     } catch (error) {
       throw redirect({ to: '/', search: getAuthErrorSearch(error) })
     }
+
+    throw redirect({ href: result.redirectTo })
   },
   component: GitHubCallbackRoute,
 })

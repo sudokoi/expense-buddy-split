@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CopyIcon, LinkIcon, ReceiptIndianRupeeIcon, RefreshCwIcon, ScaleIcon, UsersIcon } from 'lucide-react'
+import { CopyIcon, LinkIcon, ReceiptIndianRupeeIcon, RefreshCwIcon, ScaleIcon, Trash2Icon, UsersIcon } from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
 import { FieldHint, FieldLabel, FormMessage, SelectInput, TextArea, TextInput } from '@/components/groups/form-primitives'
@@ -12,7 +12,12 @@ import {
   createExpense,
   createGroupInvite,
   createSettlement,
+  deleteExpense,
+  deleteSettlement,
   renameGroup,
+  removeGroupMember,
+  revokeGroupInvite,
+  updateMemberRole,
 } from '@/features/groups/group.functions'
 import type { GroupDetail } from '@/features/groups/group-repository'
 import { groupBySlugQueryOptions } from '@/features/groups/group-query'
@@ -21,16 +26,18 @@ import { formatDateOnly, formatDateTime, formatMinorAmount } from '@/features/gr
 interface GroupDetailPageProps {
   group: GroupDetail
   redirectedFromSlug: string | null
+  currentUserId: string
 }
 
 type SplitMode = 'equal' | 'fixed' | 'percentage'
 
-export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPageProps) {
+export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: GroupDetailPageProps) {
   const queryClient = useQueryClient()
   const [renameSlug, setRenameSlug] = useState(group.slug)
   const [renameError, setRenameError] = useState<string | null>(null)
   const [inviteMessage, setInviteMessage] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [memberError, setMemberError] = useState<string | null>(null)
   const [expenseError, setExpenseError] = useState<string | null>(null)
   const [settlementError, setSettlementError] = useState<string | null>(null)
 
@@ -99,6 +106,23 @@ export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPagePr
     },
   })
 
+  const revokeInviteMutation = useMutation({
+    mutationFn: (inviteId: string) =>
+      revokeGroupInvite({
+        data: {
+          groupId: group.id,
+          inviteId,
+        },
+      }),
+    onSuccess: async () => {
+      setInviteError(null)
+      await invalidateGroup()
+    },
+    onError: (error) => {
+      setInviteError(error instanceof Error ? error.message : 'Could not revoke the invite link.')
+    },
+  })
+
   const createExpenseMutation = useMutation({
     mutationFn: () =>
       createExpense({
@@ -156,6 +180,75 @@ export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPagePr
     },
   })
 
+  const deleteExpenseMutation = useMutation({
+    mutationFn: (expenseId: string) =>
+      deleteExpense({
+        data: {
+          groupId: group.id,
+          expenseId,
+        },
+      }),
+    onSuccess: async () => {
+      setExpenseError(null)
+      await invalidateGroup()
+    },
+    onError: (error) => {
+      setExpenseError(error instanceof Error ? error.message : 'Could not delete the expense.')
+    },
+  })
+
+  const deleteSettlementMutation = useMutation({
+    mutationFn: (settlementId: string) =>
+      deleteSettlement({
+        data: {
+          groupId: group.id,
+          settlementId,
+        },
+      }),
+    onSuccess: async () => {
+      setSettlementError(null)
+      await invalidateGroup()
+    },
+    onError: (error) => {
+      setSettlementError(error instanceof Error ? error.message : 'Could not delete the settlement.')
+    },
+  })
+
+  const updateMemberRoleMutation = useMutation({
+    mutationFn: ({ memberUserId, role }: { memberUserId: string; role: 'owner' | 'member' }) =>
+      updateMemberRole({
+        data: {
+          groupId: group.id,
+          memberUserId,
+          role,
+        },
+      }),
+    onSuccess: async () => {
+      setMemberError(null)
+      await invalidateGroup()
+    },
+    onError: (error) => {
+      setMemberError(error instanceof Error ? error.message : 'Could not update the member role.')
+    },
+  })
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (memberUserId: string) =>
+      removeGroupMember({
+        data: {
+          groupId: group.id,
+          memberUserId,
+        },
+      }),
+    onSuccess: async () => {
+      setMemberError(null)
+      await invalidateGroup()
+    },
+    onError: (error) => {
+      setMemberError(error instanceof Error ? error.message : 'Could not remove that member.')
+    },
+  })
+
   const memberOptions = useMemo(
     () => group.members.map((member) => ({ label: member.displayName || member.userLogin, value: member.userId })),
     [group.members],
@@ -204,7 +297,25 @@ export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPagePr
                         <div className="font-medium text-foreground">{entry.title}</div>
                         <div className="text-sm text-muted-foreground">{entry.subtitle}</div>
                       </div>
-                      <Badge variant={entry.type === 'expense' ? 'outline' : 'secondary'}>{entry.type}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={entry.type === 'expense' ? 'outline' : 'secondary'}>{entry.type}</Badge>
+                        {entry.canManage ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (entry.type === 'expense') {
+                                deleteExpenseMutation.mutate(entry.id)
+                              } else {
+                                deleteSettlementMutation.mutate(entry.id)
+                              }
+                            }}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
                       <span className="font-medium text-foreground">{formatMinorAmount(entry.amountMinor, entry.currencyCode)}</span>
@@ -438,9 +549,32 @@ export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPagePr
                     <div className="font-medium text-foreground">{member.displayName}</div>
                     <div className="text-sm text-muted-foreground">@{member.userLogin}</div>
                   </div>
-                  <Badge variant={member.role === 'owner' ? 'accent' : 'secondary'}>{member.role}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={member.role === 'owner' ? 'accent' : 'secondary'}>{member.role}</Badge>
+                    {group.role === 'owner' && member.userId !== currentUserId ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            updateMemberRoleMutation.mutate({
+                              memberUserId: member.userId,
+                              role: member.role === 'owner' ? 'member' : 'owner',
+                            })
+                          }
+                        >
+                          {member.role === 'owner' ? 'Make member' : 'Make owner'}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => removeMemberMutation.mutate(member.userId)}>
+                          <Trash2Icon className="size-4" />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               ))}
+              {memberError ? <FormMessage>{memberError}</FormMessage> : null}
 
               {group.role === 'owner' ? (
                 <>
@@ -472,26 +606,34 @@ export function GroupDetailPage({ group, redirectedFromSlug }: GroupDetailPagePr
                     {group.invites.length ? (
                       <div className="grid gap-2 pt-2">
                         {group.invites.slice(0, 4).map((invite) => (
-                          <button
-                            key={invite.id}
-                            type="button"
-                            className="flex items-center justify-between rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-left text-sm"
-                            onClick={async () => {
-                              const absoluteUrl = `${window.location.origin}${invite.shareUrl}`
-                              try {
-                                await navigator.clipboard.writeText(absoluteUrl)
-                                setInviteMessage(`Invite copied: ${absoluteUrl}`)
-                              } catch {
-                                setInviteMessage(`Invite available: ${absoluteUrl}`)
-                              }
-                            }}
-                          >
-                            <div>
-                              <div className="font-medium text-foreground">{invite.shareUrl}</div>
-                              <div className="text-xs text-muted-foreground">Expires {formatDateOnly(invite.expiresAt)}</div>
-                            </div>
-                            <CopyIcon className="size-4 text-muted-foreground" />
-                          </button>
+                          <div key={invite.id} className="flex items-center justify-between gap-2 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm">
+                            <button
+                              type="button"
+                              className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                              onClick={async () => {
+                                const absoluteUrl = `${window.location.origin}${invite.shareUrl}`
+                                try {
+                                  await navigator.clipboard.writeText(absoluteUrl)
+                                  setInviteMessage(`Invite copied: ${absoluteUrl}`)
+                                } catch {
+                                  setInviteMessage(`Invite available: ${absoluteUrl}`)
+                                }
+                              }}
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate font-medium text-foreground">{invite.shareUrl}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {invite.revokedAt ? 'Revoked' : `Expires ${formatDateOnly(invite.expiresAt)}`}
+                                </div>
+                              </div>
+                              <CopyIcon className="size-4 shrink-0 text-muted-foreground" />
+                            </button>
+                            {!invite.revokedAt ? (
+                              <Button type="button" size="sm" variant="ghost" onClick={() => revokeInviteMutation.mutate(invite.id)}>
+                                <Trash2Icon className="size-4" />
+                              </Button>
+                            ) : null}
+                          </div>
                         ))}
                       </div>
                     ) : null}

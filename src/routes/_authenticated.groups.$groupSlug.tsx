@@ -53,5 +53,11 @@ function GroupDetailRoute() {
     )
   }
 
-  return <GroupDetailPage group={data.group} redirectedFromSlug={data.redirectedFromSlug} />
+  return (
+    <GroupDetailPage
+      group={data.group}
+      redirectedFromSlug={data.redirectedFromSlug}
+      currentUserId={data.currentUserId}
+    />
+  )
 }
