@@ -8,6 +8,7 @@ interface ImmersiveShellProps {
   className?: string
   contentClassName?: string
   surface?: 'light' | 'immersive'
+  navigation?: ReactNode
 }
 
 export function ImmersiveShell({
@@ -16,6 +17,7 @@ export function ImmersiveShell({
   className,
   contentClassName,
   surface = 'light',
+  navigation,
 }: ImmersiveShellProps) {
   return (
     <div
@@ -42,14 +44,18 @@ export function ImmersiveShell({
               </div>
             </div>
 
-            <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
-              <a href="#how-it-works" className="transition-colors hover:text-foreground">
-                How it works
-              </a>
-              <a href="#v1-scope" className="transition-colors hover:text-foreground">
-                V1 scope
-              </a>
-            </nav>
+            {navigation ? (
+              <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">{navigation}</nav>
+            ) : (
+              <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+                <a href="#how-it-works" className="transition-colors hover:text-foreground">
+                  How it works
+                </a>
+                <a href="#v1-scope" className="transition-colors hover:text-foreground">
+                  V1 scope
+                </a>
+              </nav>
+            )}
           </div>
         </header>
 

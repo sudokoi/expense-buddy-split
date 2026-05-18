@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { sanitizeRedirectTo } from '@/lib/redirect'
 import { env } from '@/lib/env.server'
+import { upsertGitHubUser } from '@/features/auth/user-repository'
 import { consumeOAuthState, issueOAuthState } from '@/server/oauth-state'
 import { authSessionConfig } from '@/server/session'
 import type { AuthSessionData } from '@/server/session'
@@ -45,13 +46,20 @@ export const completeGitHubAuthorization = createServerFn({ method: 'GET' })
 
     const tokenResponse = await exchangeGitHubCode(data.code, `${env.appOrigin}/auth/github/callback`)
     const user = await getAuthenticatedUser(tokenResponse.accessToken)
-    const session = await useSession<AuthSessionData>(authSessionConfig)
-
-    await session.update(() => ({
+    const persistedUser = await upsertGitHubUser({
       githubUserId: user.id,
       userLogin: user.login,
       displayName: user.name ?? user.login,
       avatarUrl: user.avatarUrl,
+    })
+    const session = await useSession<AuthSessionData>(authSessionConfig)
+
+    await session.update(() => ({
+      appUserId: persistedUser.id,
+      githubUserId: persistedUser.githubUserId,
+      userLogin: persistedUser.userLogin,
+      displayName: persistedUser.displayName,
+      avatarUrl: persistedUser.avatarUrl ?? undefined,
     }))
 
     return {

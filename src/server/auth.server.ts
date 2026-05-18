@@ -13,5 +13,5 @@ export function createAnonymousAuthState(): AuthState {
 }
 
 export function isAuthenticatedSession(session: AuthSessionData): boolean {
-  return Boolean(session.githubUserId && session.userLogin)
+  return Boolean(session.appUserId && session.githubUserId && session.userLogin)
 }

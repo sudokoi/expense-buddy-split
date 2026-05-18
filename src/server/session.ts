@@ -4,6 +4,7 @@ import { env } from '@/lib/env.server'
 import { authCookieOptions, getScopedCookieName } from '@/server/cookie-settings'
 
 export interface AuthSessionData {
+  appUserId?: string
   githubUserId?: number
   userLogin?: string
   displayName?: string

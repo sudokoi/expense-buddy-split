@@ -42,6 +42,8 @@ pnpm dev
 pnpm dev
 pnpm build
 pnpm preview
+pnpm db:generate
+pnpm db:push
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -65,6 +67,12 @@ The current auth slice adds:
 - protected `/groups` placeholder route
 - auth-aware homepage CTAs
 
+The current persistence slice adds:
+
+- Drizzle schema for users, groups, memberships, slug history, and invites
+- libSQL/Turso database client wiring
+- GitHub user upsert on successful authentication
+
 ## Environment Variables
 
 Copy `.env.example` and provide real values:
@@ -78,6 +86,8 @@ Required variables:
 - `SESSION_PASSWORD`
 - `GITHUB_CLIENT_ID`
 - `GITHUB_CLIENT_SECRET`
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
 
 Optional variables:
 
