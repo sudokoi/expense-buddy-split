@@ -5,15 +5,26 @@ import {
   ShieldCheckIcon,
   UsersIcon,
 } from 'lucide-react'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
 import { HomeScene } from '@/components/home/home-scene'
 import { ImmersiveShell } from '@/components/immersive-shell'
+import { getAuthErrorMessage } from '@/features/auth/errors'
+import { optionalSessionQueryOptions } from '@/features/auth/session-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/')({
+  validateSearch: (search) => ({
+    authError: typeof search.authError === 'string' ? search.authError : undefined,
+  }),
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(optionalSessionQueryOptions())
+  },
+  component: Home,
+})
 
 const features = [
   {
@@ -34,6 +45,10 @@ const features = [
 ] as const
 
 function Home() {
+  const { authError } = Route.useSearch()
+  const authErrorMessage = getAuthErrorMessage(authError)
+  const { data: session } = useSuspenseQuery(optionalSessionQueryOptions())
+
   return (
     <ImmersiveShell scene={<HomeScene />} contentClassName="max-w-6xl items-center py-10 sm:py-12">
       <div className="flex w-full flex-col gap-8">
@@ -53,13 +68,27 @@ function Home() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" render={<a href="#how-it-works" />}>
-                See how it works
-                <ArrowRightIcon data-icon="inline-end" />
-              </Button>
-              <Button size="lg" variant="outline" render={<a href="#v1-scope" />}>
-                Explore v1 scope
-              </Button>
+              {session ? (
+                <>
+                  <Button size="lg" render={<a href="/groups" />}>
+                    Open groups
+                    <ArrowRightIcon data-icon="inline-end" />
+                  </Button>
+                  <Button size="lg" variant="outline" render={<a href="/logout" />}>
+                    Sign out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="lg" render={<a href="/connect?redirectTo=%2Fgroups" />}>
+                    Continue with GitHub
+                    <ArrowRightIcon data-icon="inline-end" />
+                  </Button>
+                  <Button size="lg" variant="outline" render={<a href="#v1-scope" />}>
+                    Explore v1 scope
+                  </Button>
+                </>
+              )}
             </div>
 
             <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
@@ -73,6 +102,12 @@ function Home() {
                 Owner-managed editable slugs
               </div>
             </div>
+
+            {session ? (
+              <p className="text-sm text-muted-foreground">
+                Signed in as <span className="font-medium text-foreground">{session.userLogin}</span>.
+              </p>
+            ) : null}
           </div>
 
           <Card className="immersive-overlay-card relative border-white/35 bg-white/55 lg:ml-auto lg:max-w-xl">
@@ -107,6 +142,15 @@ function Home() {
             </CardContent>
           </Card>
         </section>
+
+        {authErrorMessage ? (
+          <Card className="border-destructive/30 bg-destructive/5 shadow-sm">
+            <CardHeader>
+              <CardTitle>GitHub sign-in could not be completed</CardTitle>
+              <CardDescription>{authErrorMessage}</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : null}
 
         <section id="how-it-works" className="grid gap-4 lg:grid-cols-3">
           {features.map((feature) => {

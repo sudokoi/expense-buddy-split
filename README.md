@@ -58,6 +58,31 @@ The first slice sets up:
 - query-aware router foundation
 - public marketing-style homepage
 
+The current auth slice adds:
+
+- GitHub OAuth sign-in
+- cookie-backed authenticated session middleware
+- protected `/groups` placeholder route
+- auth-aware homepage CTAs
+
+## Environment Variables
+
+Copy `.env.example` and provide real values:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+
+- `SESSION_PASSWORD`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+
+Optional variables:
+
+- `APP_ORIGIN`
+
 Next slices will add:
 
 - GitHub OAuth and session middleware
