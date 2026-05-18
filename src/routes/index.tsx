@@ -49,7 +49,10 @@ function Home() {
                   </p>
                 </>
               ) : (
-                <Button size="lg" render={<Link to="/connect" search={{ redirectTo: '/groups' }} />}>
+                  <Button
+                    size="lg"
+                    render={<Link to="/connect" search={{ redirectTo: '/groups' }} preload={false} />}
+                  >
                   Continue with GitHub
                   <ArrowRightIcon data-icon="inline-end" />
                 </Button>
