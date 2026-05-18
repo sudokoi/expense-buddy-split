@@ -737,10 +737,10 @@ export async function createSettlementForUser(userId: string, input: CreateSettl
 }
 
 export async function getDashboardForUser(user: AuthenticatedAppUser) {
-  const groups = await listGroupsForUser(user.id)
+  const userGroups = await listGroupsForUser(user.id)
 
   return {
-    groups,
-    hasGroups: groups.length > 0,
+    groups: userGroups,
+    hasGroups: userGroups.length > 0,
   }
 }

@@ -15,6 +15,8 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedGroupsRouteImport } from './routes/_authenticated.groups'
 import { Route as AuthGithubCallbackRouteImport } from './routes/auth.github.callback'
+import { Route as AuthenticatedJoinTokenRouteImport } from './routes/_authenticated.join.$token'
+import { Route as AuthenticatedGroupsGroupSlugRouteImport } from './routes/_authenticated.groups.$groupSlug'
 
 const LogoutRoute = LogoutRouteImport.update({
   id: '/logout',
@@ -45,19 +47,34 @@ const AuthGithubCallbackRoute = AuthGithubCallbackRouteImport.update({
   path: '/auth/github/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedJoinTokenRoute = AuthenticatedJoinTokenRouteImport.update({
+  id: '/join/$token',
+  path: '/join/$token',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedGroupsGroupSlugRoute =
+  AuthenticatedGroupsGroupSlugRouteImport.update({
+    id: '/$groupSlug',
+    path: '/$groupSlug',
+    getParentRoute: () => AuthenticatedGroupsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connect': typeof ConnectRoute
   '/logout': typeof LogoutRoute
-  '/groups': typeof AuthenticatedGroupsRoute
+  '/groups': typeof AuthenticatedGroupsRouteWithChildren
+  '/groups/$groupSlug': typeof AuthenticatedGroupsGroupSlugRoute
+  '/join/$token': typeof AuthenticatedJoinTokenRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connect': typeof ConnectRoute
   '/logout': typeof LogoutRoute
-  '/groups': typeof AuthenticatedGroupsRoute
+  '/groups': typeof AuthenticatedGroupsRouteWithChildren
+  '/groups/$groupSlug': typeof AuthenticatedGroupsGroupSlugRoute
+  '/join/$token': typeof AuthenticatedJoinTokenRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRoutesById {
@@ -66,14 +83,30 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/connect': typeof ConnectRoute
   '/logout': typeof LogoutRoute
-  '/_authenticated/groups': typeof AuthenticatedGroupsRoute
+  '/_authenticated/groups': typeof AuthenticatedGroupsRouteWithChildren
+  '/_authenticated/groups/$groupSlug': typeof AuthenticatedGroupsGroupSlugRoute
+  '/_authenticated/join/$token': typeof AuthenticatedJoinTokenRoute
   '/auth/github/callback': typeof AuthGithubCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connect' | '/logout' | '/groups' | '/auth/github/callback'
+  fullPaths:
+    | '/'
+    | '/connect'
+    | '/logout'
+    | '/groups'
+    | '/groups/$groupSlug'
+    | '/join/$token'
+    | '/auth/github/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connect' | '/logout' | '/groups' | '/auth/github/callback'
+  to:
+    | '/'
+    | '/connect'
+    | '/logout'
+    | '/groups'
+    | '/groups/$groupSlug'
+    | '/join/$token'
+    | '/auth/github/callback'
   id:
     | '__root__'
     | '/'
@@ -81,6 +114,8 @@ export interface FileRouteTypes {
     | '/connect'
     | '/logout'
     | '/_authenticated/groups'
+    | '/_authenticated/groups/$groupSlug'
+    | '/_authenticated/join/$token'
     | '/auth/github/callback'
   fileRoutesById: FileRoutesById
 }
@@ -136,15 +171,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthGithubCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/join/$token': {
+      id: '/_authenticated/join/$token'
+      path: '/join/$token'
+      fullPath: '/join/$token'
+      preLoaderRoute: typeof AuthenticatedJoinTokenRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/groups/$groupSlug': {
+      id: '/_authenticated/groups/$groupSlug'
+      path: '/$groupSlug'
+      fullPath: '/groups/$groupSlug'
+      preLoaderRoute: typeof AuthenticatedGroupsGroupSlugRouteImport
+      parentRoute: typeof AuthenticatedGroupsRoute
+    }
   }
 }
 
+interface AuthenticatedGroupsRouteChildren {
+  AuthenticatedGroupsGroupSlugRoute: typeof AuthenticatedGroupsGroupSlugRoute
+}
+
+const AuthenticatedGroupsRouteChildren: AuthenticatedGroupsRouteChildren = {
+  AuthenticatedGroupsGroupSlugRoute: AuthenticatedGroupsGroupSlugRoute,
+}
+
+const AuthenticatedGroupsRouteWithChildren =
+  AuthenticatedGroupsRoute._addFileChildren(AuthenticatedGroupsRouteChildren)
+
 interface AuthenticatedRouteChildren {
-  AuthenticatedGroupsRoute: typeof AuthenticatedGroupsRoute
+  AuthenticatedGroupsRoute: typeof AuthenticatedGroupsRouteWithChildren
+  AuthenticatedJoinTokenRoute: typeof AuthenticatedJoinTokenRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedGroupsRoute: AuthenticatedGroupsRoute,
+  AuthenticatedGroupsRoute: AuthenticatedGroupsRouteWithChildren,
+  AuthenticatedJoinTokenRoute: AuthenticatedJoinTokenRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
