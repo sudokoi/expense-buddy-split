@@ -1,0 +1,225 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: #fff8f0;
+  --foreground: #4a4458;
+  --card: #fffaf5;
+  --card-foreground: #4a4458;
+  --popover: #fffaf5;
+  --popover-foreground: #4a4458;
+  --primary: #ffb6c1;
+  --primary-foreground: #4a4458;
+  --secondary: #e6e6fa;
+  --secondary-foreground: #4a4458;
+  --muted: #fffaf5;
+  --muted-foreground: #8b7b96;
+  --accent: #98fb98;
+  --accent-foreground: #1a5a3a;
+  --destructive: #ff8a8a;
+  --border: #e6e6fa;
+  --input: #fffaf5;
+  --ring: #ff91a4;
+  --radius: 1rem;
+  --ambient-top: rgb(255 182 193 / 0.16);
+  --ambient-bottom: rgb(152 251 152 / 0.12);
+  --shell-scene-opacity: 0.32;
+  --immersive-nav-bg: rgb(255 250 245 / 0.72);
+  --immersive-nav-border: rgb(230 230 250 / 0.78);
+  --immersive-nav-shadow: 0 24px 80px rgb(74 68 88 / 0.12);
+}
+
+.dark {
+  --background: #1a1625;
+  --foreground: #f0e6f6;
+  --card: #252033;
+  --card-foreground: #f0e6f6;
+  --popover: #252033;
+  --popover-foreground: #f0e6f6;
+  --primary: #ffb6c1;
+  --primary-foreground: #1a1625;
+  --secondary: #302840;
+  --secondary-foreground: #f0e6f6;
+  --muted: #252033;
+  --muted-foreground: #b8a9c9;
+  --accent: #9370db;
+  --accent-foreground: #f0e6f6;
+  --destructive: #ff8a8a;
+  --border: #3a3050;
+  --input: #252033;
+  --ring: #ff69b4;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition:
+    background-color 420ms ease,
+    color 420ms ease,
+    background-image 420ms ease;
+  background-image:
+    radial-gradient(circle at top, var(--ambient-top), transparent 30%),
+    radial-gradient(circle at bottom right, var(--ambient-bottom), transparent 24%);
+}
+
+.immersive-shell-dark {
+  --background: #120f1d;
+  --foreground: #f4edf8;
+  --card: rgb(37 32 51 / 0.8);
+  --card-foreground: #f4edf8;
+  --popover: rgb(37 32 51 / 0.94);
+  --popover-foreground: #f4edf8;
+  --secondary: rgb(56 44 83 / 0.78);
+  --secondary-foreground: #f4edf8;
+  --muted: rgb(37 32 51 / 0.86);
+  --muted-foreground: #d1c3df;
+  --border: rgb(135 113 174 / 0.22);
+  --input: rgb(37 32 51 / 0.8);
+  --ambient-top: rgb(255 145 164 / 0.24);
+  --ambient-bottom: rgb(152 251 152 / 0.14);
+  --shell-scene-opacity: 0.82;
+  --immersive-nav-bg: rgb(21 17 33 / 0.55);
+  --immersive-nav-border: rgb(255 255 255 / 0.12);
+  --immersive-nav-shadow: 0 24px 90px rgb(0 0 0 / 0.28);
+}
+
+.immersive-shell {
+  position: relative;
+  overflow: clip;
+}
+
+.immersive-shell__ambient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgb(255 182 193 / 0.2), transparent 32%),
+    radial-gradient(circle at 80% 20%, rgb(230 230 250 / 0.44), transparent 24%),
+    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.18), transparent 26%);
+  pointer-events: none;
+  transition:
+    opacity 420ms ease,
+    background 420ms ease;
+}
+
+.immersive-shell-dark .immersive-shell__ambient {
+  background:
+    radial-gradient(circle at top left, rgb(255 145 164 / 0.24), transparent 34%),
+    radial-gradient(circle at 80% 20%, rgb(212 196 251 / 0.16), transparent 28%),
+    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.12), transparent 30%);
+}
+
+.immersive-shell__scene {
+  position: absolute;
+  inset: 0;
+  opacity: var(--shell-scene-opacity);
+  transition: opacity 420ms ease;
+}
+
+.immersive-nav {
+  border: 1px solid var(--immersive-nav-border);
+  background: var(--immersive-nav-bg);
+  box-shadow: var(--immersive-nav-shadow);
+  backdrop-filter: blur(22px);
+  transition:
+    background-color 420ms ease,
+    border-color 420ms ease,
+    box-shadow 420ms ease;
+}
+
+.immersive-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgb(255 145 164 / 0.22), transparent 22%),
+    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.12), transparent 22%);
+  pointer-events: none;
+}
+
+.immersive-overlay-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.home-hero-section::before {
+  content: '';
+  position: absolute;
+  top: 4.75rem;
+  left: 50%;
+  z-index: -1;
+  width: min(78vw, 68rem);
+  height: min(56vw, 38rem);
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0));
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .immersive-shell__scene {
+    opacity: calc(var(--shell-scene-opacity) * 0.8);
+  }
+
+  .home-hero-section::before {
+    top: 6rem;
+    width: min(96vw, 32rem);
+    height: min(72vw, 24rem);
+  }
+
+  .immersive-nav {
+    border-radius: 1.5rem;
+  }
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+[role='button']:not(:disabled) {
+  cursor: pointer;
+}
