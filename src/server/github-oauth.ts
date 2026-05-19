@@ -54,7 +54,7 @@ export async function getAuthenticatedUser(accessToken: string): Promise<GitHubI
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${accessToken}`,
-      'User-Agent': 'expense-buddy-split',
+      'User-Agent': 'balance-buddy',
     },
   })
 

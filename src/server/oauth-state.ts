@@ -6,7 +6,7 @@ import { sanitizeRedirectTo } from '@/lib/redirect'
 import { env } from '@/lib/env.server'
 import { authCookieOptions, getScopedCookieName } from '@/server/cookie-settings'
 
-const OAUTH_COOKIE = getScopedCookieName('expense-buddy-split-oauth')
+const OAUTH_COOKIE = getScopedCookieName('balance-buddy-oauth')
 const OAUTH_TTL_SECONDS = 60 * 10
 
 function toBase64Url(value: Buffer | string): string {

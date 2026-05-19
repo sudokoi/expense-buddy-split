@@ -1,5 +1,5 @@
 {
-  "name": "expense-buddy-split",
+  "name": "balance-buddy",
   "private": true,
   "packageManager": "pnpm@11.0.9",
   "type": "module",

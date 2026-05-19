@@ -39,7 +39,7 @@ export function ImmersiveShell({
             <div className="flex items-center gap-3">
               <div className="size-3 rounded-full bg-primary shadow-[0_0_30px_rgba(255,145,164,0.55)]" />
               <div>
-                <div className="text-sm font-semibold tracking-tight sm:text-base">Expense Buddy Split</div>
+                <div className="text-sm font-semibold tracking-tight sm:text-base">BalanceBuddy</div>
                 <div className="text-xs text-muted-foreground">Shared groups, splits, and settle-ups</div>
               </div>
             </div>

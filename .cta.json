@@ -1,5 +1,5 @@
 {
-  "projectName": "expense-buddy-split",
+  "projectName": "balance-buddy",
   "mode": "file-router",
   "typescript": true,
   "tailwind": true,

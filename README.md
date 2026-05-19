@@ -1,8 +1,8 @@
-# Expense Buddy Split
+# BalanceBuddy
 
-Expense Buddy Split is a TanStack Start web app for shared expense groups.
+BalanceBuddy is a TanStack Start web app for shared expense groups.
 
-The app is being built around a few core ideas:
+The app is built around a few core ideas:
 
 - GitHub sign-in for identity
 - group-based expense sharing
@@ -53,26 +53,32 @@ pnpm format:check
 
 ## Current Build Status
 
-The first slice sets up:
+BalanceBuddy currently includes:
 
-- TanStack Start app scaffolding
-- shared pastel design system
-- query-aware router foundation
-- public marketing-style homepage
+- GitHub OAuth sign-in with cookie-backed sessions
+- homepage-first auth flow that preserves the intended destination
+- groups dashboard with first-group empty state
+- group creation with slug-based URLs
+- redirectable slug history for renamed groups
+- reusable invite links with authenticated join flow
+- expenses, settlements, and derived balance summaries
+- Turso/libSQL persistence through Drizzle
+- mirrored app assets and manifest branding
 
-The current auth slice adds:
+Core routes:
 
-- GitHub OAuth sign-in
-- cookie-backed authenticated session middleware
-- protected `/groups` placeholder route
-- auth-aware homepage CTAs
+- `/`
+- `/groups`
+- `/groups/:groupSlug`
+- `/join/:token`
+- `/auth/github/callback`
 
-The current persistence slice adds:
+Verification:
 
-- Drizzle schema for users, groups, memberships, slug history, and invites
-- libSQL/Turso database client wiring
-- GitHub user upsert on successful authentication
-- HTTP-based Turso client usage so remote deployments do not depend on local native SQLite binaries
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm lint`
+- `pnpm build`
 
 ## Environment Variables
 
@@ -94,11 +100,10 @@ Optional variables:
 
 - `APP_ORIGIN`
 
-Next slices will add:
+Notes:
 
-- GitHub OAuth and session middleware
-- Drizzle + Turso schema and migrations
-- groups, invites, expenses, settlements, and balances
+- Local development defaults to `http://localhost:3000` when `APP_ORIGIN` is unset.
+- Production should set `APP_ORIGIN=https://balancebuddy.sudh.online`.
 
 ## Deployment
 
@@ -106,9 +111,18 @@ This app currently uses Nitro as the deployment adapter.
 
 For remote Turso deployments, the app uses the HTTP libSQL client path instead of the native sqlite transport. That keeps Vercel/Linux deployments from depending on the macOS-native `libsql` binary traced during local builds.
 
+This repository deploys automatically on Vercel when changes are pushed to GitHub. Ensure the Vercel project is configured with the same environment variables listed above, especially:
+
+- `APP_ORIGIN=https://balancebuddy.sudh.online`
+- `SESSION_PASSWORD`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
+
 ```bash
 pnpm build
-node dist/server/index.mjs
+node .output/server/index.mjs
 ```
 
 For host-specific presets and deployment notes, see https://v3.nitro.build/deploy.

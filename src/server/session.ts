@@ -13,7 +13,7 @@ export interface AuthSessionData {
 
 export const authSessionConfig: SessionConfig = {
   password: env.sessionPassword,
-  name: getScopedCookieName('expense-buddy-split'),
+  name: getScopedCookieName('balance-buddy'),
   maxAge: 60 * 60 * 24 * 30,
   cookie: authCookieOptions,
 }

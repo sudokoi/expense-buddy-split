@@ -1,6 +1,6 @@
 {
-  "short_name": "Expense Buddy",
-  "name": "Expense Buddy Split",
+  "short_name": "BalanceBuddy",
+  "name": "BalanceBuddy",
   "icons": [
     {
       "src": "expense-buddy.png",
