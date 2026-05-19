@@ -2,14 +2,23 @@ export type GroupRole = 'owner' | 'member'
 export type SplitMode = 'equal' | 'fixed' | 'percentage'
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const maxSlugLength = 48
 
-export function normalizeGroupSlug(input: string) {
-  const slug = input
+function slugifyGroupInput(input: string) {
+  return input
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-')
+}
+
+function trimSlugLength(slug: string, maxLength = maxSlugLength) {
+  return slug.slice(0, maxLength).replace(/-+$/g, '')
+}
+
+export function normalizeGroupSlug(input: string) {
+  const slug = trimSlugLength(slugifyGroupInput(input))
 
   if (!slug) {
     throw new Error('Enter a group slug.')
@@ -20,6 +29,26 @@ export function normalizeGroupSlug(input: string) {
   }
 
   return slug
+}
+
+export function buildSuggestedGroupSlug(input: string, sequence = 1) {
+  let slug = trimSlugLength(slugifyGroupInput(input))
+
+  if (!slug) {
+    slug = 'group'
+  }
+
+  if (slug.length < 3) {
+    slug = trimSlugLength(`${slug}-group`)
+  }
+
+  if (sequence > 1) {
+    const suffix = `-${sequence}`
+    const base = trimSlugLength(slug, maxSlugLength - suffix.length) || 'group'
+    slug = `${base}${suffix}`
+  }
+
+  return normalizeGroupSlug(slug)
 }
 
 export function parseAmountInputToMinorUnits(input: string) {

@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest'
 
 import { buildLedgerSnapshot, createGroupRecords, evaluateInviteState } from '@/features/groups/group-domain'
-import { buildPercentageShares, distributeEqualShares, normalizeGroupSlug } from '@/features/groups/group-shared'
+import {
+  buildPercentageShares,
+  buildSuggestedGroupSlug,
+  distributeEqualShares,
+  normalizeGroupSlug,
+} from '@/features/groups/group-shared'
 
 describe('group domain', () => {
   test('createGroupRecords creates owner membership for the creator', () => {
@@ -123,6 +128,11 @@ describe('group domain', () => {
 describe('group shared helpers', () => {
   test('normalizeGroupSlug normalizes mixed input', () => {
     expect(normalizeGroupSlug('  Goa Trip 2026  ')).toBe('goa-trip-2026')
+  })
+
+  test('buildSuggestedGroupSlug derives a usable slug from short names and adds numeric suffixes', () => {
+    expect(buildSuggestedGroupSlug('AI')).toBe('ai-group')
+    expect(buildSuggestedGroupSlug('Goa Trip 2026', 2)).toBe('goa-trip-2026-2')
   })
 
   test('distributeEqualShares spreads remainder across first participants', () => {

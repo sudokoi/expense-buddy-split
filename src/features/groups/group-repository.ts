@@ -15,6 +15,7 @@ import {
 } from '@/db/schema'
 import { buildLedgerSnapshot, createGroupRecords, evaluateInviteState } from '@/features/groups/group-domain'
 import {
+  buildSuggestedGroupSlug,
   buildFixedShares,
   buildPercentageShares,
   distributeEqualShares,
@@ -260,6 +261,36 @@ async function requireDistinctSlug(slug: string, currentGroupId?: string) {
   if (historicalGroup && historicalGroup.groupId !== currentGroupId) {
     throw new Error('That slug has already been used and cannot be reused.')
   }
+}
+
+async function isSlugTaken(slug: string, currentGroupId?: string) {
+  const db = getDb()
+
+  const existingGroup = await db.query.groups.findFirst({
+    where: eq(groups.slug, slug),
+  })
+
+  if (existingGroup && existingGroup.id !== currentGroupId) {
+    return true
+  }
+
+  const historicalGroup = await db.query.groupSlugHistory.findFirst({
+    where: eq(groupSlugHistory.slug, slug),
+  })
+
+  return Boolean(historicalGroup && historicalGroup.groupId !== currentGroupId)
+}
+
+export async function suggestAvailableGroupSlug(name: string) {
+  for (let sequence = 1; sequence < 1_000; sequence += 1) {
+    const slug = buildSuggestedGroupSlug(name, sequence)
+
+    if (!(await isSlugTaken(slug))) {
+      return { slug }
+    }
+  }
+
+  throw new Error('Could not generate an available group slug.')
 }
 
 export async function createGroupForUser(user: AuthenticatedAppUser, input: CreateGroupInput) {
@@ -922,5 +953,6 @@ export async function getDashboardForUser(user: AuthenticatedAppUser) {
   return {
     groups: userGroups,
     hasGroups: userGroups.length > 0,
+    userLogin: user.userLogin,
   }
 }

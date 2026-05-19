@@ -1,14 +1,14 @@
-import { useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
+import { Dialog } from '@base-ui/react/dialog'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ArrowRightIcon, PlusIcon, UsersIcon } from 'lucide-react'
+import { ArrowRightIcon, PlusIcon } from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
 import { FieldHint, FieldLabel, FormMessage, TextInput } from '@/components/groups/form-primitives'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { createGroup } from '@/features/groups/group.functions'
+import { createGroup, suggestGroupSlug } from '@/features/groups/group.functions'
 import type { GroupSummary } from '@/features/groups/group-repository'
 import { groupsDashboardQueryOptions } from '@/features/groups/group-query'
 
@@ -20,9 +20,54 @@ interface GroupsDashboardProps {
 export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const deferredName = useDeferredValue(name)
+
+  function resetCreateGroupForm() {
+    setIsCreateDialogOpen(false)
+    setName('')
+    setSlug('')
+    setIsSlugManuallyEdited(false)
+    setErrorMessage(null)
+  }
+
+  useEffect(() => {
+    if (isSlugManuallyEdited) {
+      return
+    }
+
+    const nextName = deferredName.trim()
+    if (!nextName) {
+      setSlug('')
+      return
+    }
+
+    let cancelled = false
+
+    void suggestGroupSlug({
+      data: {
+        name: nextName,
+      },
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setSlug(result.slug)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSlug('')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [deferredName, isSlugManuallyEdited])
 
   const createGroupMutation = useMutation({
     mutationFn: async () => {
@@ -37,9 +82,7 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
       return result
     },
     onSuccess: async (result) => {
-      setErrorMessage(null)
-      setName('')
-      setSlug('')
+      resetCreateGroupForm()
       await queryClient.invalidateQueries({ queryKey: groupsDashboardQueryOptions().queryKey })
       await navigate({ to: '/groups/$groupSlug', params: { groupSlug: result.slug } })
     },
@@ -49,42 +92,41 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
   })
 
   return (
-    <AppShell
-      title="Your groups"
-      description={`Signed in as ${userLogin}. Create a group, invite people, and keep balances explainable from one shared ledger.`}
-      actions={
-        <Button render={<a href="#create-group" />}>
-          Create group
-          <PlusIcon data-icon="inline-end" />
-        </Button>
-      }
-    >
-      <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+    <>
+      <AppShell
+        title="Groups"
+        description={`Signed in as ${userLogin}. Open a group or create a new one when you need it.`}
+        actions={
+          <Button type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            Create group
+            <PlusIcon data-icon="inline-end" />
+          </Button>
+        }
+      >
         <Card className="border-border/70 bg-card/65">
-          <CardHeader>
-            <Badge variant="accent" className="w-fit">
-              Live app
-            </Badge>
-            <CardTitle>{groups.length ? 'Pick up where your group left off' : 'Start your first group'}</CardTitle>
+          <CardHeader className="gap-2">
+            <CardTitle>{groups.length ? 'Your groups' : 'No groups yet'}</CardTitle>
             <CardDescription>
-              Groups are slug-based, invite by link, and keep a ledger that combines shared expenses with settle-up entries.
+              {groups.length
+                ? 'Open a group to review balances, record entries, or invite more people.'
+                : 'Create your first group to start tracking shared expenses.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
+          <CardContent className="grid gap-3">
             {groups.length ? (
               groups.map((group) => (
                 <Link
                   key={group.id}
                   to="/groups/$groupSlug"
                   params={{ groupSlug: group.slug }}
-                  className="rounded-[1.35rem] border border-border/70 bg-background/70 p-4 transition hover:border-ring/40 hover:bg-background"
+                  className="rounded-[1.25rem] border border-border/70 bg-background/70 px-4 py-3 transition hover:border-ring/40 hover:bg-background"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="font-medium text-foreground">{group.name}</div>
+                    <div className="min-w-0 space-y-1">
+                      <div className="truncate font-medium text-foreground">{group.name}</div>
                       <div className="text-sm text-muted-foreground">/{group.slug}</div>
                     </div>
-                    <Badge variant={group.role === 'owner' ? 'accent' : 'secondary'}>{group.role}</Badge>
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{group.role}</div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{group.memberCount} members</span>
@@ -93,26 +135,31 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                 </Link>
               ))
             ) : (
-              <div className="rounded-[1.5rem] border border-dashed border-border/80 bg-background/65 p-6 text-sm leading-6 text-muted-foreground">
-                No groups yet. Create one on the right, then share the invite link with everyone who should be part of the ledger.
+              <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/65 p-6 text-sm leading-6 text-muted-foreground">
+                <p>No groups yet. Create one, share the invite link, and keep the ledger in one place.</p>
+                <Button type="button" size="sm" className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
+                  Create your first group
+                  <PlusIcon data-icon="inline-end" />
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
+      </AppShell>
 
-        <Card id="create-group" className="border-border/70 bg-card/75">
-          <CardHeader>
-            <div className="mb-2 flex size-11 items-center justify-center rounded-[1rem] bg-primary/18 text-primary">
-              <UsersIcon className="size-5" />
+      <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-foreground/18 backdrop-blur-sm" />
+          <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-border/80 bg-background/95 p-5 text-foreground shadow-[0_32px_90px_rgba(74,68,88,0.22)] outline-none">
+            <div className="space-y-1">
+              <Dialog.Title className="text-lg font-semibold tracking-tight">Create group</Dialog.Title>
+              <Dialog.Description className="text-sm leading-6 text-muted-foreground">
+                Pick a clear name and URL slug. You can rename the slug later.
+              </Dialog.Description>
             </div>
-            <CardTitle>Create a group</CardTitle>
-            <CardDescription>
-              Slugs stay in the URL, and old ones can later redirect through slug history when owners rename them.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+
             <form
-              className="space-y-4"
+              className="mt-5 space-y-4"
               onSubmit={(event) => {
                 event.preventDefault()
                 createGroupMutation.mutate()
@@ -124,7 +171,8 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                   id="group-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Goa trip 2026"
+                  placeholder="Household expenses"
+                  autoFocus
                 />
               </div>
 
@@ -133,22 +181,30 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                 <TextInput
                   id="group-slug"
                   value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
-                  placeholder="goa-trip-2026"
+                  onChange={(event) => {
+                    setSlug(event.target.value)
+                    setIsSlugManuallyEdited(true)
+                  }}
+                  placeholder="household-expenses"
                 />
-                <FieldHint>Use lowercase letters, numbers, and hyphens only.</FieldHint>
+                <FieldHint>Generated from the group name. You can edit it before creating the group.</FieldHint>
               </div>
 
               {errorMessage ? <FormMessage>{errorMessage}</FormMessage> : null}
 
-              <Button type="submit" size="lg" disabled={createGroupMutation.isPending}>
-                {createGroupMutation.isPending ? 'Creating...' : 'Create group'}
-                <ArrowRightIcon data-icon="inline-end" />
-              </Button>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="ghost" onClick={resetCreateGroupForm}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createGroupMutation.isPending}>
+                  {createGroupMutation.isPending ? 'Creating...' : 'Create group'}
+                  <ArrowRightIcon data-icon="inline-end" />
+                </Button>
+              </div>
             </form>
-          </CardContent>
-        </Card>
-      </div>
-    </AppShell>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   )
 }

@@ -17,6 +17,7 @@ import {
   revokeInviteForOwner,
   requirePersistedUserByGitHubId,
   removeMemberForOwner,
+  suggestAvailableGroupSlug,
   updateExpenseForUser,
   updateMemberRoleForOwner,
   updateSettlementForUser,
@@ -52,6 +53,10 @@ const groupIdSchema = z.object({
 
 const groupSlugSchema = z.object({
   slug: z.string().min(1),
+})
+
+const suggestGroupSlugSchema = z.object({
+  name: z.string().min(1),
 })
 
 const inviteTokenSchema = z.object({
@@ -133,6 +138,13 @@ export const createGroup = createServerFn({ method: 'POST' })
   .handler(async ({ context, data }) => {
     const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
     return createGroupForUser(user, data)
+  })
+
+export const suggestGroupSlug = createServerFn({ method: 'GET' })
+  .middleware([requireAuthenticatedSessionMiddleware])
+  .inputValidator(suggestGroupSlugSchema)
+  .handler(async ({ data }) => {
+    return suggestAvailableGroupSlug(data.name)
   })
 
 export const renameGroup = createServerFn({ method: 'POST' })
