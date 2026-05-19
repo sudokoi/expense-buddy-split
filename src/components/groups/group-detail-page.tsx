@@ -76,6 +76,9 @@ export function GroupDetailPage({
     group.members[0]?.userId || '',
   )
   const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({})
+  const [lastEditedPayerUserId, setLastEditedPayerUserId] = useState<
+    string | null
+  >(null)
   const [expenseOccurredOn, setExpenseOccurredOn] = useState('')
   const [splitMode, setSplitMode] = useState<SplitMode>('fixed')
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<
@@ -198,6 +201,7 @@ export function GroupDetailPage({
       setSplitMode('fixed')
       setSelectedParticipantIds(group.members.map((member) => member.userId))
       setPayerAmounts({})
+      setLastEditedPayerUserId(null)
       setFixedShares({})
       setPercentageShares({})
       await invalidateGroup()
@@ -337,6 +341,106 @@ export function GroupDetailPage({
     [group.members],
   )
 
+  const formatMinorInput = (amountMinor: number) => {
+    const whole = Math.floor(amountMinor / 100)
+    const fraction = amountMinor % 100
+
+    if (fraction === 0) {
+      return String(whole)
+    }
+
+    return `${whole}.${String(fraction).padStart(2, '0').replace(/0$/, '')}`
+  }
+
+  const parseDraftAmountToMinor = (value: string) => {
+    const normalized = value.trim()
+
+    if (!normalized) {
+      return 0
+    }
+
+    if (!/^\d+(?:\.\d{0,2})?$/.test(normalized)) {
+      return null
+    }
+
+    const [wholePart, fractionPart = ''] = normalized.split('.')
+
+    return (
+      Number.parseInt(wholePart, 10) * 100 +
+      Number.parseInt(fractionPart.padEnd(2, '0'), 10)
+    )
+  }
+
+  const buildEqualPercentageValues = (participantIds: string[]) => {
+    if (!participantIds.length) {
+      return {}
+    }
+
+    const baseBasisPoints = Math.floor(10_000 / participantIds.length)
+    let remainder = 10_000 - baseBasisPoints * participantIds.length
+
+    return Object.fromEntries(
+      participantIds.map((participantId) => {
+        const basisPoints = baseBasisPoints + (remainder > 0 ? 1 : 0)
+        remainder = Math.max(0, remainder - 1)
+
+        return [
+          participantId,
+          basisPoints % 100 === 0
+            ? String(basisPoints / 100)
+            : (basisPoints / 100).toFixed(2),
+        ]
+      }),
+    )
+  }
+
+  const rebalanceTwoParticipantPayers = (
+    nextPayerAmounts: Record<string, string>,
+    controllingUserId: string | null,
+    nextParticipantIds = selectedParticipantIds,
+    nextExpenseAmount = expenseAmount,
+  ) => {
+    if (
+      !controllingUserId ||
+      nextParticipantIds.length !== 2 ||
+      !nextParticipantIds.includes(controllingUserId)
+    ) {
+      return nextPayerAmounts
+    }
+
+    const totalMinor = parseDraftAmountToMinor(nextExpenseAmount)
+    if (totalMinor === null) {
+      return nextPayerAmounts
+    }
+
+    const controllingMinor = parseDraftAmountToMinor(
+      nextPayerAmounts[controllingUserId] || '',
+    )
+    if (controllingMinor === null) {
+      return nextPayerAmounts
+    }
+
+    const otherUserId = nextParticipantIds.find(
+      (participantId) => participantId !== controllingUserId,
+    )
+
+    if (!otherUserId) {
+      return nextPayerAmounts
+    }
+
+    if (controllingMinor > totalMinor) {
+      return {
+        ...nextPayerAmounts,
+        [otherUserId]: '',
+      }
+    }
+
+    return {
+      ...nextPayerAmounts,
+      [otherUserId]: formatMinorInput(totalMinor - controllingMinor),
+    }
+  }
+
   const membersByUserId = useMemo(
     () => new Map(group.members.map((member) => [member.userId, member])),
     [group.members],
@@ -344,14 +448,9 @@ export function GroupDetailPage({
 
   const exportableEntries = useMemo(
     () =>
-      group.ledgerEntries
-        .filter(
-          (entry) => entry.type === 'expense' || entry.type === 'settlement',
-        )
-        .sort(
-          (left, right) =>
-            right.occurredAt.valueOf() - left.occurredAt.valueOf(),
-        ),
+      group.ledgerEntries.sort(
+        (left, right) => right.occurredAt.valueOf() - left.occurredAt.valueOf(),
+      ),
     [group.ledgerEntries],
   )
 
@@ -366,14 +465,21 @@ export function GroupDetailPage({
       return `"${normalized.replaceAll('"', '""')}"`
     }
 
-    const formatMinorForCsv = (amountMinor: number) => (amountMinor / 100).toFixed(2)
+    const formatMinorForCsv = (amountMinor: number) =>
+      (amountMinor / 100).toFixed(2)
 
     const rows = exportableEntries.map((entry) => {
       if (entry.type === 'expense') {
         const paidBy = membersByUserId.get(entry.expense.paidByUserId)
-        const payers = (entry.expense.payers.length
-          ? entry.expense.payers
-          : [{ userId: entry.expense.paidByUserId, amountMinor: entry.amountMinor }]
+        const payers = (
+          entry.expense.payers.length
+            ? entry.expense.payers
+            : [
+                {
+                  userId: entry.expense.paidByUserId,
+                  amountMinor: entry.amountMinor,
+                },
+              ]
         )
           .map((payer) => {
             const member = membersByUserId.get(payer.userId)
@@ -407,7 +513,9 @@ export function GroupDetailPage({
           formatDateTime(entry.occurredAt),
           formatMinorForCsv(entry.amountMinor),
           entry.currencyCode,
-          paidBy?.displayName || paidBy?.userLogin || entry.expense.paidByUserId,
+          paidBy?.displayName ||
+            paidBy?.userLogin ||
+            entry.expense.paidByUserId,
           payers,
           entry.expense.splitMode,
           participants,
@@ -419,21 +527,25 @@ export function GroupDetailPage({
       const fromMember = membersByUserId.get(entry.settlement.fromUserId)
       const toMember = membersByUserId.get(entry.settlement.toUserId)
 
-        return [
-          'settlement',
-          entry.id,
-          entry.title,
-          entry.settlement.note || '',
-          formatDateTime(entry.occurredAt),
-          formatMinorForCsv(entry.amountMinor),
-          entry.currencyCode,
-          '',
-          '',
-          '',
-          '',
-          fromMember?.displayName || fromMember?.userLogin || entry.settlement.fromUserId,
-          toMember?.displayName || toMember?.userLogin || entry.settlement.toUserId,
-        ]
+      return [
+        'settlement',
+        entry.id,
+        entry.title,
+        entry.settlement.note || '',
+        formatDateTime(entry.occurredAt),
+        formatMinorForCsv(entry.amountMinor),
+        entry.currencyCode,
+        '',
+        '',
+        '',
+        '',
+        fromMember?.displayName ||
+          fromMember?.userLogin ||
+          entry.settlement.fromUserId,
+        toMember?.displayName ||
+          toMember?.userLogin ||
+          entry.settlement.toUserId,
+      ]
     })
 
     const csvContent = [
@@ -527,7 +639,18 @@ export function GroupDetailPage({
                     <TextInput
                       id="expense-amount"
                       value={expenseAmount}
-                      onChange={(event) => setExpenseAmount(event.target.value)}
+                      onChange={(event) => {
+                        const nextAmount = event.target.value
+                        setExpenseAmount(nextAmount)
+                        setPayerAmounts((current) =>
+                          rebalanceTwoParticipantPayers(
+                            current,
+                            lastEditedPayerUserId,
+                            selectedParticipantIds,
+                            nextAmount,
+                          ),
+                        )
+                      }}
                       placeholder="1250"
                     />
                   </div>
@@ -567,11 +690,26 @@ export function GroupDetailPage({
                     <SelectInput
                       id="split-mode"
                       value={splitMode}
-                      onChange={(event) =>
-                        setSplitMode(event.target.value as SplitMode)
-                      }
+                      onChange={(event) => {
+                        const nextSplitMode = event.target.value as SplitMode
+                        setSplitMode(nextSplitMode)
+
+                        if (nextSplitMode === 'percentage') {
+                          setPercentageShares((current) => {
+                            const hasAllSelectedValues =
+                              selectedParticipantIds.every((participantId) =>
+                                current[participantId].trim(),
+                              )
+
+                            return hasAllSelectedValues
+                              ? current
+                              : buildEqualPercentageValues(
+                                  selectedParticipantIds,
+                                )
+                          })
+                        }
+                      }}
                     >
-                      <option value="equal">Equal</option>
                       <option value="fixed">Fixed amounts</option>
                       <option value="percentage">Percentages</option>
                     </SelectInput>
@@ -601,13 +739,21 @@ export function GroupDetailPage({
                           value={payerAmounts[member.userId] || ''}
                           onChange={(event) => {
                             const nextValue = event.target.value
-                            setPayerAmounts((current) => ({
-                              ...current,
-                              [member.userId]: nextValue,
-                            }))
+                            setLastEditedPayerUserId(member.userId)
+                            setPayerAmounts((current) =>
+                              rebalanceTwoParticipantPayers(
+                                {
+                                  ...current,
+                                  [member.userId]: nextValue,
+                                },
+                                member.userId,
+                              ),
+                            )
                           }}
                           placeholder={
-                            member.userId === expensePaidBy ? expenseAmount || '0' : '0'
+                            member.userId === expensePaidBy
+                              ? expenseAmount || '0'
+                              : '0'
                           }
                         />
                       </div>
@@ -615,7 +761,8 @@ export function GroupDetailPage({
                   </div>
                   <FieldHint>
                     Leave this blank to treat the selected payer as having paid
-                    the full amount.
+                    the full amount. With two participants, the second payer
+                    auto-fills from the remaining amount.
                   </FieldHint>
                 </div>
 
@@ -640,13 +787,31 @@ export function GroupDetailPage({
                             type="checkbox"
                             checked={checked}
                             onChange={(event) => {
-                              setSelectedParticipantIds((current) =>
-                                event.target.checked
+                              setSelectedParticipantIds((current) => {
+                                const nextParticipantIds = event.target.checked
                                   ? [...current, member.userId]
                                   : current.filter(
                                       (value) => value !== member.userId,
+                                    )
+
+                                if (splitMode === 'percentage') {
+                                  setPercentageShares(
+                                    buildEqualPercentageValues(
+                                      nextParticipantIds,
                                     ),
-                              )
+                                  )
+                                }
+
+                                setPayerAmounts((currentPayerAmounts) =>
+                                  rebalanceTwoParticipantPayers(
+                                    currentPayerAmounts,
+                                    lastEditedPayerUserId,
+                                    nextParticipantIds,
+                                  ),
+                                )
+
+                                return nextParticipantIds
+                              })
                             }}
                           />
                           <span>{member.displayName}</span>

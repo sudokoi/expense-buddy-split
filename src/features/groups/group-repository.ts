@@ -18,8 +18,8 @@ import {
   buildLedgerSnapshot,
   createGroupRecords,
   evaluateInviteState,
-  type LedgerEntrySummary,
 } from '@/features/groups/group-domain'
+import type { LedgerEntrySummary } from '@/features/groups/group-domain'
 import {
   buildSuggestedGroupSlug,
   buildFixedShares,
@@ -923,7 +923,9 @@ export async function updateExpenseForUser(
       })
       .where(eq(expenses.id, expense.id))
 
-    await tx.delete(expensePayers).where(eq(expensePayers.expenseId, expense.id))
+    await tx
+      .delete(expensePayers)
+      .where(eq(expensePayers.expenseId, expense.id))
 
     await tx.insert(expensePayers).values(
       payers.map((payer) => ({
@@ -974,7 +976,9 @@ export async function deleteExpenseForUser(
   }
 
   await db.transaction(async (tx) => {
-    await tx.delete(expensePayers).where(eq(expensePayers.expenseId, expense.id))
+    await tx
+      .delete(expensePayers)
+      .where(eq(expensePayers.expenseId, expense.id))
     await tx
       .delete(expenseParticipants)
       .where(eq(expenseParticipants.expenseId, expense.id))
