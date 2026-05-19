@@ -149,7 +149,9 @@ export function buildFixedShares(
   amountMinor: number,
   valuesByUserId: Record<string, string>,
 ) {
-  const entries = Object.entries(valuesByUserId)
+  const entries = Object.entries(valuesByUserId).filter(([, value]) =>
+    value.trim(),
+  )
   if (!entries.length) {
     throw new Error('Add at least one participant share.')
   }
@@ -170,11 +172,48 @@ export function buildFixedShares(
   return shares
 }
 
+export function buildExpensePayers(
+  amountMinor: number,
+  valuesByUserId?: Record<string, string>,
+  fallbackUserId?: string,
+) {
+  const entries = Object.entries(valuesByUserId || {}).filter(([, value]) =>
+    value.trim(),
+  )
+
+  if (!entries.length) {
+    if (!fallbackUserId) {
+      throw new Error('Add at least one payer.')
+    }
+
+    return [
+      {
+        userId: fallbackUserId,
+        amountMinor,
+      },
+    ]
+  }
+
+  const payers = entries.map(([userId, value]) => ({
+    userId,
+    amountMinor: parseAmountInputToMinorUnits(value),
+  }))
+
+  const total = payers.reduce((sum, payer) => sum + payer.amountMinor, 0)
+  if (total !== amountMinor) {
+    throw new Error('Payer amounts must add up to the total expense amount.')
+  }
+
+  return payers
+}
+
 export function buildPercentageShares(
   amountMinor: number,
   valuesByUserId: Record<string, string>,
 ) {
-  const entries = Object.entries(valuesByUserId)
+  const entries = Object.entries(valuesByUserId).filter(([, value]) =>
+    value.trim(),
+  )
   if (!entries.length) {
     throw new Error('Add at least one participant percentage.')
   }

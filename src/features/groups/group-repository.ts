@@ -4,6 +4,7 @@ import { alias } from 'drizzle-orm/sqlite-core'
 import { getDb } from '@/db/client'
 import { createId } from '@/db/ids'
 import {
+  expensePayers,
   expenseParticipants,
   expenses,
   groupInvites,
@@ -17,10 +18,12 @@ import {
   buildLedgerSnapshot,
   createGroupRecords,
   evaluateInviteState,
+  type LedgerEntrySummary,
 } from '@/features/groups/group-domain'
 import {
   buildSuggestedGroupSlug,
   buildFixedShares,
+  buildExpensePayers,
   buildPercentageShares,
   distributeEqualShares,
   ensureIsoDate,
@@ -65,17 +68,6 @@ export interface GroupInviteSummary {
   maxUses: number | null
   revokedAt: Date | null
   createdAt: Date
-}
-
-export interface LedgerEntrySummary {
-  id: string
-  type: 'expense' | 'settlement'
-  title: string
-  subtitle: string
-  amountMinor: number
-  currencyCode: string
-  occurredAt: Date
-  canManage: boolean
 }
 
 export interface BalanceSummary {
@@ -129,7 +121,8 @@ interface CreateExpenseInput {
   title: string
   notes?: string
   amount: string
-  paidByUserId: string
+  paidByUserId?: string
+  payerAmounts?: Record<string, string>
   splitMode: 'equal' | 'fixed' | 'percentage'
   participantUserIds: string[]
   fixedShares?: Record<string, string>
@@ -477,6 +470,7 @@ async function getLedgerRecords(groupId: string) {
   const expenseRows = await db.query.expenses.findMany({
     where: eq(expenses.groupId, groupId),
     with: {
+      payers: true,
       participants: true,
     },
   })
@@ -493,6 +487,17 @@ async function getLedgerRecords(groupId: string) {
       amountMinor: expense.amountMinor,
       currencyCode: expense.currencyCode,
       paidByUserId: expense.paidByUserId,
+      payers: expense.payers.length
+        ? expense.payers.map((payer) => ({
+            userId: payer.userId,
+            amountMinor: payer.amountMinor,
+          }))
+        : [
+            {
+              userId: expense.paidByUserId,
+              amountMinor: expense.amountMinor,
+            },
+          ],
       splitMode: expense.splitMode,
       occurredAt: expense.occurredAt,
       createdByUserId: expense.createdByUserId,
@@ -732,6 +737,18 @@ async function requireUsersInGroup(groupId: string, userIds: string[]) {
   return uniqueUserIds
 }
 
+function selectShareInputs(
+  userIds: string[],
+  valuesByUserId: Record<string, string> | undefined,
+) {
+  return Object.fromEntries(
+    userIds.flatMap((userId) => {
+      const value = valuesByUserId?.[userId]?.trim()
+      return value ? [[userId, value]] : []
+    }),
+  )
+}
+
 export async function createExpenseForUser(
   userId: string,
   input: CreateExpenseInput,
@@ -756,17 +773,29 @@ export async function createExpenseForUser(
     group.id,
     input.participantUserIds,
   )
-  const paidByUserIds = await requireUsersInGroup(group.id, [
+  const payers = buildExpensePayers(
+    amountMinor,
+    input.payerAmounts,
     input.paidByUserId,
-  ])
+  )
+  const payerUserIds = await requireUsersInGroup(
+    group.id,
+    payers.map((payer) => payer.userId),
+  )
   const occurredAt = ensureIsoDate(input.occurredOn)
 
   const shares =
     input.splitMode === 'equal'
       ? distributeEqualShares(amountMinor, participantUserIds)
       : input.splitMode === 'fixed'
-        ? buildFixedShares(amountMinor, input.fixedShares || {})
-        : buildPercentageShares(amountMinor, input.percentageShares || {})
+        ? buildFixedShares(
+            amountMinor,
+            selectShareInputs(participantUserIds, input.fixedShares),
+          )
+        : buildPercentageShares(
+            amountMinor,
+            selectShareInputs(participantUserIds, input.percentageShares),
+          )
 
   await requireUsersInGroup(
     group.id,
@@ -784,13 +813,22 @@ export async function createExpenseForUser(
       notes: input.notes?.trim() || null,
       amountMinor,
       currencyCode: group.currencyCode,
-      paidByUserId: paidByUserIds[0],
+      paidByUserId: payerUserIds[0],
       splitMode: input.splitMode,
       occurredAt,
       createdByUserId: userId,
       createdAt: now,
       updatedAt: now,
     })
+
+    await tx.insert(expensePayers).values(
+      payers.map((payer) => ({
+        id: createId(),
+        expenseId,
+        userId: payer.userId,
+        amountMinor: payer.amountMinor,
+      })),
+    )
 
     await tx.insert(expenseParticipants).values(
       shares.map((share) => ({
@@ -844,17 +882,29 @@ export async function updateExpenseForUser(
     group.id,
     input.participantUserIds,
   )
-  const paidByUserIds = await requireUsersInGroup(group.id, [
+  const payers = buildExpensePayers(
+    amountMinor,
+    input.payerAmounts,
     input.paidByUserId,
-  ])
+  )
+  const payerUserIds = await requireUsersInGroup(
+    group.id,
+    payers.map((payer) => payer.userId),
+  )
   const occurredAt = ensureIsoDate(input.occurredOn)
 
   const shares =
     input.splitMode === 'equal'
       ? distributeEqualShares(amountMinor, participantUserIds)
       : input.splitMode === 'fixed'
-        ? buildFixedShares(amountMinor, input.fixedShares || {})
-        : buildPercentageShares(amountMinor, input.percentageShares || {})
+        ? buildFixedShares(
+            amountMinor,
+            selectShareInputs(participantUserIds, input.fixedShares),
+          )
+        : buildPercentageShares(
+            amountMinor,
+            selectShareInputs(participantUserIds, input.percentageShares),
+          )
 
   const now = new Date()
 
@@ -866,12 +916,23 @@ export async function updateExpenseForUser(
         notes: input.notes?.trim() || null,
         amountMinor,
         currencyCode: group.currencyCode,
-        paidByUserId: paidByUserIds[0],
+        paidByUserId: payerUserIds[0],
         splitMode: input.splitMode,
         occurredAt,
         updatedAt: now,
       })
       .where(eq(expenses.id, expense.id))
+
+    await tx.delete(expensePayers).where(eq(expensePayers.expenseId, expense.id))
+
+    await tx.insert(expensePayers).values(
+      payers.map((payer) => ({
+        id: createId(),
+        expenseId: expense.id,
+        userId: payer.userId,
+        amountMinor: payer.amountMinor,
+      })),
+    )
 
     await tx
       .delete(expenseParticipants)
@@ -913,6 +974,7 @@ export async function deleteExpenseForUser(
   }
 
   await db.transaction(async (tx) => {
+    await tx.delete(expensePayers).where(eq(expensePayers.expenseId, expense.id))
     await tx
       .delete(expenseParticipants)
       .where(eq(expenseParticipants.expenseId, expense.id))

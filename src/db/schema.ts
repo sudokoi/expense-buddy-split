@@ -114,6 +114,26 @@ export const expenses = sqliteTable(
   () => [],
 )
 
+export const expensePayers = sqliteTable(
+  'expense_payers',
+  {
+    id: text('id').primaryKey(),
+    expenseId: text('expense_id')
+      .notNull()
+      .references(() => expenses.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    amountMinor: integer('amount_minor').notNull(),
+  },
+  (table) => [
+    uniqueIndex('expense_payers_expense_user_idx').on(
+      table.expenseId,
+      table.userId,
+    ),
+  ],
+)
+
 export const expenseParticipants = sqliteTable(
   'expense_participants',
   {
@@ -166,6 +186,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   createdInvites: many(groupInvites),
   paidExpenses: many(expenses, { relationName: 'expense_paid_by_user' }),
   createdExpenses: many(expenses, { relationName: 'expense_created_by_user' }),
+  expensePayments: many(expensePayers),
   expenseParticipations: many(expenseParticipants),
   outgoingSettlements: many(settlements, {
     relationName: 'settlement_from_user',
@@ -237,7 +258,19 @@ export const expensesRelations = relations(expenses, ({ one, many }) => ({
     fields: [expenses.createdByUserId],
     references: [users.id],
   }),
+  payers: many(expensePayers),
   participants: many(expenseParticipants),
+}))
+
+export const expensePayersRelations = relations(expensePayers, ({ one }) => ({
+  expense: one(expenses, {
+    fields: [expensePayers.expenseId],
+    references: [expenses.id],
+  }),
+  user: one(users, {
+    fields: [expensePayers.userId],
+    references: [users.id],
+  }),
 }))
 
 export const expenseParticipantsRelations = relations(
@@ -283,6 +316,7 @@ export const schema = {
   groupMembers,
   groupInvites,
   expenses,
+  expensePayers,
   expenseParticipants,
   settlements,
   usersRelations,
@@ -291,6 +325,7 @@ export const schema = {
   groupMembersRelations,
   groupInvitesRelations,
   expensesRelations,
+  expensePayersRelations,
   expenseParticipantsRelations,
   settlementsRelations,
 } as const

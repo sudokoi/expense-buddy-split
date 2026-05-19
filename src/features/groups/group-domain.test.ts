@@ -106,18 +106,28 @@ describe('group domain', () => {
           amountMinor: 3000,
           currencyCode: 'INR',
           paidByUserId: 'user-1',
-          splitMode: 'equal',
+          payers: [
+            {
+              userId: 'user-1',
+              amountMinor: 2000,
+            },
+            {
+              userId: 'user-2',
+              amountMinor: 1000,
+            },
+          ],
+          splitMode: 'fixed',
           occurredAt: new Date('2026-05-18T10:00:00.000Z'),
           createdByUserId: 'user-1',
           participants: [
             {
               userId: 'user-1',
-              amountMinor: 1500,
+              amountMinor: 1000,
               percentageBasisPoints: null,
             },
             {
               userId: 'user-2',
-              amountMinor: 1500,
+              amountMinor: 2000,
               percentageBasisPoints: null,
             },
           ],
@@ -143,8 +153,8 @@ describe('group domain', () => {
       canManage: true,
     })
     expect(snapshot.balances).toEqual([
-      expect.objectContaining({ userId: 'user-1', balanceMinor: 1000 }),
-      expect.objectContaining({ userId: 'user-2', balanceMinor: -1000 }),
+      expect.objectContaining({ userId: 'user-1', balanceMinor: 500 }),
+      expect.objectContaining({ userId: 'user-2', balanceMinor: -500 }),
     ])
   })
 })

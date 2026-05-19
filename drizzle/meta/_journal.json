@@ -22,6 +22,13 @@
       "when": 1779163024456,
       "tag": "0002_overconfident_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779166035371,
+      "tag": "0003_great_vargas",
+      "breakpoints": true
     }
   ]
 }

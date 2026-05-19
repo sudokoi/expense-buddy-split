@@ -47,7 +47,7 @@ export function AppShell({
       contentClassName={cn('py-8 sm:py-10', contentClassName)}
     >
       <div className="flex w-full flex-col gap-6">
-        <section className="grid gap-4 rounded-[2rem] border border-border/70 bg-card/70 p-5 shadow-[0_20px_60px_rgba(74,68,88,0.08)] backdrop-blur-xl sm:p-6 lg:grid-cols-[1fr_auto] lg:items-end">
+        <section className="grid gap-4 rounded-[2rem] border border-border/70 bg-card/70 p-5 shadow-[0_20px_60px_rgba(74,68,88,0.08)] backdrop-blur-xl sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
               {title}

@@ -32,6 +32,11 @@ export interface LedgerExpenseParticipant {
   percentageBasisPoints: number | null
 }
 
+export interface LedgerExpensePayer {
+  userId: string
+  amountMinor: number
+}
+
 export interface LedgerExpenseRecord {
   id: string
   title: string
@@ -39,6 +44,7 @@ export interface LedgerExpenseRecord {
   amountMinor: number
   currencyCode: string
   paidByUserId: string
+  payers: LedgerExpensePayer[]
   splitMode: SplitMode
   occurredAt: Date
   createdByUserId: string
@@ -121,6 +127,19 @@ function getDisplayName(
   return member?.displayName || member?.userLogin || 'Unknown member'
 }
 
+function describeExpensePayers(
+  expense: LedgerExpenseRecord,
+  membersByUserId: Map<string, LedgerMember>,
+) {
+  const payers = expense.payers.length
+    ? expense.payers
+    : [{ userId: expense.paidByUserId, amountMinor: expense.amountMinor }]
+
+  return payers
+    .map((payer) => getDisplayName(payer.userId, membersByUserId))
+    .join(', ')
+}
+
 export function createGroupRecords(input: CreateGroupRecordsInput) {
   const groupId = input.createId()
 
@@ -177,7 +196,7 @@ export function buildLedgerSnapshot(input: BuildLedgerSnapshotInput) {
       id: expense.id,
       type: 'expense' as const,
       title: expense.title,
-      subtitle: `Paid by ${getDisplayName(expense.paidByUserId, membersByUserId)}`,
+      subtitle: `Paid by ${describeExpensePayers(expense, membersByUserId)}`,
       amountMinor: expense.amountMinor,
       currencyCode: expense.currencyCode,
       occurredAt: expense.occurredAt,
@@ -204,10 +223,16 @@ export function buildLedgerSnapshot(input: BuildLedgerSnapshotInput) {
   )
 
   for (const expense of input.expenses) {
-    balances.set(
-      expense.paidByUserId,
-      (balances.get(expense.paidByUserId) || 0) + expense.amountMinor,
-    )
+    const payers = expense.payers.length
+      ? expense.payers
+      : [{ userId: expense.paidByUserId, amountMinor: expense.amountMinor }]
+
+    for (const payer of payers) {
+      balances.set(
+        payer.userId,
+        (balances.get(payer.userId) || 0) + payer.amountMinor,
+      )
+    }
 
     for (const participant of expense.participants) {
       balances.set(

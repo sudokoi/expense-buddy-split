@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CopyIcon, LinkIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
+import {
+  CopyIcon,
+  DownloadIcon,
+  LinkIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+} from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
 import {
@@ -47,7 +53,7 @@ interface GroupDetailPageProps {
   currentUserId: string
 }
 
-type SplitMode = 'equal' | 'fixed' | 'percentage'
+type SplitMode = 'fixed' | 'percentage'
 
 export function GroupDetailPage({
   group,
@@ -69,8 +75,9 @@ export function GroupDetailPage({
   const [expensePaidBy, setExpensePaidBy] = useState(
     group.members[0]?.userId || '',
   )
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({})
   const [expenseOccurredOn, setExpenseOccurredOn] = useState('')
-  const [splitMode, setSplitMode] = useState<SplitMode>('equal')
+  const [splitMode, setSplitMode] = useState<SplitMode>('fixed')
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<
     string[]
   >(group.members.map((member) => member.userId))
@@ -129,9 +136,9 @@ export function GroupDetailPage({
       const absoluteUrl = `${window.location.origin}${result.shareUrl}`
       try {
         await navigator.clipboard.writeText(absoluteUrl)
-        showToast(`Invite copied: ${absoluteUrl}`)
+        showToast(`Invite copied: ${absoluteUrl}`, 'success')
       } catch {
-        showToast(`Invite created: ${absoluteUrl}`)
+        showToast(`Invite created: ${absoluteUrl}`, 'info')
       }
       await invalidateGroup()
     },
@@ -174,6 +181,7 @@ export function GroupDetailPage({
           notes: expenseNotes,
           amount: expenseAmount,
           paidByUserId: expensePaidBy,
+          payerAmounts,
           splitMode,
           participantUserIds: selectedParticipantIds,
           fixedShares,
@@ -187,8 +195,9 @@ export function GroupDetailPage({
       setExpenseNotes('')
       setExpenseAmount('')
       setExpenseOccurredOn('')
-      setSplitMode('equal')
+      setSplitMode('fixed')
       setSelectedParticipantIds(group.members.map((member) => member.userId))
+      setPayerAmounts({})
       setFixedShares({})
       setPercentageShares({})
       await invalidateGroup()
@@ -328,6 +337,138 @@ export function GroupDetailPage({
     [group.members],
   )
 
+  const membersByUserId = useMemo(
+    () => new Map(group.members.map((member) => [member.userId, member])),
+    [group.members],
+  )
+
+  const exportableEntries = useMemo(
+    () =>
+      group.ledgerEntries
+        .filter(
+          (entry) => entry.type === 'expense' || entry.type === 'settlement',
+        )
+        .sort(
+          (left, right) =>
+            right.occurredAt.valueOf() - left.occurredAt.valueOf(),
+        ),
+    [group.ledgerEntries],
+  )
+
+  const downloadActivityCsv = () => {
+    if (!exportableEntries.length) {
+      showToast('No expenses or settlements available to export.', 'info')
+      return
+    }
+
+    const escapeCsvValue = (value: string | number | null | undefined) => {
+      const normalized = value == null ? '' : String(value)
+      return `"${normalized.replaceAll('"', '""')}"`
+    }
+
+    const formatMinorForCsv = (amountMinor: number) => (amountMinor / 100).toFixed(2)
+
+    const rows = exportableEntries.map((entry) => {
+      if (entry.type === 'expense') {
+        const paidBy = membersByUserId.get(entry.expense.paidByUserId)
+        const payers = (entry.expense.payers.length
+          ? entry.expense.payers
+          : [{ userId: entry.expense.paidByUserId, amountMinor: entry.amountMinor }]
+        )
+          .map((payer) => {
+            const member = membersByUserId.get(payer.userId)
+            return [
+              member?.displayName || member?.userLogin || payer.userId,
+              formatMinorForCsv(payer.amountMinor),
+            ].join(':')
+          })
+          .join(' | ')
+        const participants = entry.expense.participants
+          .map((participant) => {
+            const member = membersByUserId.get(participant.userId)
+            const percentage =
+              participant.percentageBasisPoints === null
+                ? ''
+                : (participant.percentageBasisPoints / 100).toFixed(2)
+
+            return [
+              member?.displayName || member?.userLogin || participant.userId,
+              formatMinorForCsv(participant.amountMinor),
+              percentage,
+            ].join(':')
+          })
+          .join(' | ')
+
+        return [
+          'expense',
+          entry.id,
+          entry.title,
+          entry.expense.notes || '',
+          formatDateTime(entry.occurredAt),
+          formatMinorForCsv(entry.amountMinor),
+          entry.currencyCode,
+          paidBy?.displayName || paidBy?.userLogin || entry.expense.paidByUserId,
+          payers,
+          entry.expense.splitMode,
+          participants,
+          '',
+          '',
+        ]
+      }
+
+      const fromMember = membersByUserId.get(entry.settlement.fromUserId)
+      const toMember = membersByUserId.get(entry.settlement.toUserId)
+
+        return [
+          'settlement',
+          entry.id,
+          entry.title,
+          entry.settlement.note || '',
+          formatDateTime(entry.occurredAt),
+          formatMinorForCsv(entry.amountMinor),
+          entry.currencyCode,
+          '',
+          '',
+          '',
+          '',
+          fromMember?.displayName || fromMember?.userLogin || entry.settlement.fromUserId,
+          toMember?.displayName || toMember?.userLogin || entry.settlement.toUserId,
+        ]
+    })
+
+    const csvContent = [
+      [
+        'type',
+        'entry_id',
+        'title',
+        'notes',
+        'occurred_at',
+        'amount',
+        'currency',
+        'paid_by',
+        'payers',
+        'split_mode',
+        'participants',
+        'settlement_from',
+        'settlement_to',
+      ],
+      ...rows,
+    ]
+      .map((row) => row.map((value) => escapeCsvValue(value)).join(','))
+      .join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
+    const downloadUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = downloadUrl
+    anchor.download = `${group.slug}-activity.csv`
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(downloadUrl)
+    showToast(`Downloaded CSV for ${group.name}`, 'success')
+  }
+
   const recentLedgerEntries = group.ledgerEntries.slice(0, 8)
   const visibleInvites = group.invites.slice(0, 4)
   const canRecordSettlement = group.members.length > 1
@@ -402,7 +543,9 @@ export function GroupDetailPage({
                     />
                   </div>
                   <div className="space-y-2">
-                    <FieldLabel htmlFor="expense-paid-by">Paid by</FieldLabel>
+                    <FieldLabel htmlFor="expense-paid-by">
+                      Default payer
+                    </FieldLabel>
                     <SelectInput
                       id="expense-paid-by"
                       value={expensePaidBy}
@@ -414,6 +557,10 @@ export function GroupDetailPage({
                         </option>
                       ))}
                     </SelectInput>
+                    <FieldHint>
+                      Used as the default payer if you do not split the payment
+                      below.
+                    </FieldHint>
                   </div>
                   <div className="space-y-2">
                     <FieldLabel htmlFor="split-mode">Split mode</FieldLabel>
@@ -428,7 +575,48 @@ export function GroupDetailPage({
                       <option value="fixed">Fixed amounts</option>
                       <option value="percentage">Percentages</option>
                     </SelectInput>
+                    <FieldHint>
+                      Split the expense by amount or by percentage.
+                    </FieldHint>
                   </div>
+                </div>
+
+                <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldLabel>Who paid</FieldLabel>
+                    <span className="text-xs text-muted-foreground">
+                      Amounts must add up to the total
+                    </span>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {group.members.map((member) => (
+                      <div
+                        key={member.userId}
+                        className="grid gap-2 sm:grid-cols-[1fr_140px] sm:items-center"
+                      >
+                        <div className="text-sm font-medium text-foreground">
+                          {member.displayName}
+                        </div>
+                        <TextInput
+                          value={payerAmounts[member.userId] || ''}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            setPayerAmounts((current) => ({
+                              ...current,
+                              [member.userId]: nextValue,
+                            }))
+                          }}
+                          placeholder={
+                            member.userId === expensePaidBy ? expenseAmount || '0' : '0'
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <FieldHint>
+                    Leave this blank to treat the selected payer as having paid
+                    the full amount.
+                  </FieldHint>
                 </div>
 
                 <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
@@ -467,60 +655,57 @@ export function GroupDetailPage({
                     })}
                   </div>
                   <FieldHint>
-                    Equal splits divide the amount automatically across selected
-                    participants.
+                    Choose which members should share this expense.
                   </FieldHint>
                 </div>
 
-                {splitMode !== 'equal' ? (
-                  <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
-                    {selectedParticipantIds.map((participantId) => {
-                      const member = group.members.find(
-                        (item) => item.userId === participantId,
-                      )
-                      if (!member) {
-                        return null
-                      }
+                <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
+                  {selectedParticipantIds.map((participantId) => {
+                    const member = group.members.find(
+                      (item) => item.userId === participantId,
+                    )
+                    if (!member) {
+                      return null
+                    }
 
-                      const valueMap =
-                        splitMode === 'fixed' ? fixedShares : percentageShares
+                    const valueMap =
+                      splitMode === 'fixed' ? fixedShares : percentageShares
 
-                      return (
-                        <div
-                          key={participantId}
-                          className="grid gap-2 sm:grid-cols-[1fr_160px] sm:items-center"
-                        >
-                          <div className="text-sm font-medium text-foreground">
-                            {member.displayName}
-                          </div>
-                          <TextInput
-                            value={valueMap[participantId] || ''}
-                            onChange={(event) => {
-                              const nextValue = event.target.value
-                              if (splitMode === 'fixed') {
-                                setFixedShares((current) => ({
-                                  ...current,
-                                  [participantId]: nextValue,
-                                }))
-                              } else {
-                                setPercentageShares((current) => ({
-                                  ...current,
-                                  [participantId]: nextValue,
-                                }))
-                              }
-                            }}
-                            placeholder={splitMode === 'fixed' ? '250' : '25'}
-                          />
+                    return (
+                      <div
+                        key={participantId}
+                        className="grid gap-2 sm:grid-cols-[1fr_160px] sm:items-center"
+                      >
+                        <div className="text-sm font-medium text-foreground">
+                          {member.displayName}
                         </div>
-                      )
-                    })}
-                    <FieldHint>
-                      {splitMode === 'fixed'
-                        ? 'Amounts must add up to the total.'
-                        : 'Percentages must add up to 100.'}
-                    </FieldHint>
-                  </div>
-                ) : null}
+                        <TextInput
+                          value={valueMap[participantId] || ''}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            if (splitMode === 'fixed') {
+                              setFixedShares((current) => ({
+                                ...current,
+                                [participantId]: nextValue,
+                              }))
+                            } else {
+                              setPercentageShares((current) => ({
+                                ...current,
+                                [participantId]: nextValue,
+                              }))
+                            }
+                          }}
+                          placeholder={splitMode === 'fixed' ? '250' : '25'}
+                        />
+                      </div>
+                    )
+                  })}
+                  <FieldHint>
+                    {splitMode === 'fixed'
+                      ? 'Amounts must add up to the total.'
+                      : 'Percentages must add up to 100.'}
+                  </FieldHint>
+                </div>
 
                 <details className="rounded-[1.25rem] border border-border/70 bg-background/70 p-4 [&_summary::-webkit-details-marker]:hidden">
                   <summary className="list-none cursor-pointer text-sm font-medium text-foreground">
@@ -564,10 +749,22 @@ export function GroupDetailPage({
                     Latest expenses and settle-ups.
                   </CardDescription>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {group.ledgerEntries.length
-                    ? `${group.ledgerEntries.length} total`
-                    : 'No entries yet'}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {group.ledgerEntries.length
+                      ? `${group.ledgerEntries.length} total`
+                      : 'No entries yet'}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={downloadActivityCsv}
+                    disabled={!exportableEntries.length}
+                  >
+                    <DownloadIcon className="size-4" />
+                    Download CSV
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -935,10 +1132,14 @@ export function GroupDetailPage({
                                   await navigator.clipboard.writeText(
                                     absoluteUrl,
                                   )
-                                  showToast(`Invite copied: ${absoluteUrl}`)
+                                  showToast(
+                                    `Invite copied: ${absoluteUrl}`,
+                                    'success',
+                                  )
                                 } catch {
                                   showToast(
                                     `Could not copy invite link: ${absoluteUrl}`,
+                                    'error',
                                   )
                                 }
                               }}
