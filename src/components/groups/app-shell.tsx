@@ -57,7 +57,9 @@ export function AppShell({
             </p>
           </div>
           {actions ? (
-            <div className="flex flex-wrap gap-3 lg:justify-end">{actions}</div>
+            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+              {actions}
+            </div>
           ) : null}
         </section>
         {children}

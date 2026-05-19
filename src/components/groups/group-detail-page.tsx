@@ -2,10 +2,13 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
+  ActivityIcon,
   CopyIcon,
   DownloadIcon,
   LinkIcon,
+  ReceiptTextIcon,
   RefreshCwIcon,
+  Settings2Icon,
   Trash2Icon,
 } from 'lucide-react'
 
@@ -46,6 +49,7 @@ import {
   formatDateTime,
   formatMinorAmount,
 } from '@/features/groups/group-shared'
+import { cn } from '@/lib/utils'
 
 interface GroupDetailPageProps {
   group: GroupDetail
@@ -54,6 +58,7 @@ interface GroupDetailPageProps {
 }
 
 type SplitMode = 'fixed' | 'percentage'
+type MobileSection = 'expense' | 'activity' | 'group'
 
 export function GroupDetailPage({
   group,
@@ -98,6 +103,8 @@ export function GroupDetailPage({
   const [settlementAmount, setSettlementAmount] = useState('')
   const [settlementNote, setSettlementNote] = useState('')
   const [settlementOccurredOn, setSettlementOccurredOn] = useState('')
+  const [mobileSection, setMobileSection] =
+    useState<MobileSection>('expense')
 
   const invalidateGroup = () =>
     queryClient.invalidateQueries({
@@ -448,7 +455,7 @@ export function GroupDetailPage({
 
   const exportableEntries = useMemo(
     () =>
-      group.ledgerEntries.sort(
+      group.ledgerEntries.slice().sort(
         (left, right) => right.occurredAt.valueOf() - left.occurredAt.valueOf(),
       ),
     [group.ledgerEntries],
@@ -584,6 +591,24 @@ export function GroupDetailPage({
   const recentLedgerEntries = group.ledgerEntries.slice(0, 8)
   const visibleInvites = group.invites.slice(0, 4)
   const canRecordSettlement = group.members.length > 1
+  const mobileSections: Array<{
+    id: MobileSection
+    label: string
+    icon: typeof ReceiptTextIcon
+  }> = [
+    { id: 'expense', label: 'Expense', icon: ReceiptTextIcon },
+    { id: 'activity', label: 'Activity', icon: ActivityIcon },
+    { id: 'group', label: 'Group', icon: Settings2Icon },
+  ]
+
+  const focusSection = (section: MobileSection) => {
+    setMobileSection(section)
+
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`${section}-section`)
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   return (
     <AppShell
@@ -600,17 +625,48 @@ export function GroupDetailPage({
         </>
       }
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_340px]">
-        <div className="space-y-5">
-          {redirectedFromSlug ? (
-            <Card size="sm" className="border-accent/35 bg-accent/8">
-              <CardContent className="py-1 text-sm text-muted-foreground">
-                `/{redirectedFromSlug}` now redirects to `/{group.slug}`.
-              </CardContent>
-            </Card>
-          ) : null}
+      <div className="flex w-full flex-col gap-4 pb-24 sm:gap-5 sm:pb-0">
+        {redirectedFromSlug ? (
+          <Card size="sm" className="border-accent/35 bg-accent/8">
+            <CardContent className="py-1 text-sm text-muted-foreground">
+              `/{redirectedFromSlug}` now redirects to `/{group.slug}`.
+            </CardContent>
+          </Card>
+        ) : null}
 
-          <Card className="border-border/70 bg-card/75">
+        <div className="sticky top-3 z-10 hidden sm:flex xl:top-4">
+          <div className="flex items-center gap-2 rounded-[1.3rem] border border-border/70 bg-card/85 p-2 shadow-[0_14px_40px_rgba(74,68,88,0.08)] backdrop-blur-xl">
+            {mobileSections.map((section) => (
+              <Button
+                key={section.id}
+                type="button"
+                size="sm"
+                variant={mobileSection === section.id ? 'secondary' : 'ghost'}
+                className="h-10 rounded-[1rem] px-3"
+                onClick={() => focusSection(section.id)}
+              >
+                <section.icon className="size-4" />
+                {section.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_340px]">
+          <div
+            id="expense-section"
+            className={cn(
+              'space-y-5',
+              mobileSection === 'group' && 'hidden xl:block',
+            )}
+          >
+
+          <Card
+            className={cn(
+              'border-border/70 bg-card/75',
+              mobileSection !== 'expense' && 'hidden xl:flex',
+            )}
+          >
             <CardHeader className="gap-2">
               <CardTitle>Add an expense</CardTitle>
               <CardDescription>
@@ -905,16 +961,22 @@ export function GroupDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="border-border/70 bg-card/70">
+          <Card
+            id="activity-section"
+            className={cn(
+              'border-border/70 bg-card/70',
+              mobileSection !== 'activity' && 'hidden xl:flex',
+            )}
+          >
             <CardHeader className="gap-2">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle>Recent activity</CardTitle>
                   <CardDescription>
                     Latest expenses and settle-ups.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="text-xs text-muted-foreground">
                     {group.ledgerEntries.length
                       ? `${group.ledgerEntries.length} total`
@@ -990,7 +1052,13 @@ export function GroupDetailPage({
           </Card>
         </div>
 
-        <div className="space-y-5">
+        <div
+          id="group-section"
+          className={cn(
+            'space-y-5',
+            mobileSection !== 'group' && 'hidden xl:block',
+          )}
+        >
           <Card size="sm" className="border-border/70 bg-card/75">
             <CardHeader className="gap-1">
               <CardTitle>Balances</CardTitle>
@@ -1178,7 +1246,7 @@ export function GroupDetailPage({
               {group.members.map((member) => (
                 <div
                   key={member.userId}
-                  className="flex items-center justify-between gap-4 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3"
+                  className="flex flex-col gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="truncate font-medium text-foreground">
@@ -1188,7 +1256,7 @@ export function GroupDetailPage({
                       @{member.userLogin}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     <Badge
                       variant={member.role === 'owner' ? 'accent' : 'secondary'}
                     >
@@ -1260,7 +1328,7 @@ export function GroupDetailPage({
                   </div>
 
                   <div className="space-y-2 rounded-[1rem] border border-border/70 bg-background/75 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="font-medium text-foreground">
                           Invite links
@@ -1342,6 +1410,25 @@ export function GroupDetailPage({
               ) : null}
             </div>
           </details>
+        </div>
+
+        </div>
+
+        <div className="fixed inset-x-4 bottom-4 z-20 sm:hidden">
+          <div className="grid grid-cols-3 gap-2 rounded-[1.6rem] border border-border/70 bg-card/90 p-2 shadow-[0_20px_50px_rgba(74,68,88,0.14)] backdrop-blur-xl">
+            {mobileSections.map((section) => (
+              <Button
+                key={section.id}
+                type="button"
+                variant={mobileSection === section.id ? 'secondary' : 'ghost'}
+                className="h-14 flex-col gap-1 rounded-[1.1rem] px-2 text-[0.72rem]"
+                onClick={() => focusSection(section.id)}
+              >
+                <section.icon className="size-4" />
+                {section.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </AppShell>
