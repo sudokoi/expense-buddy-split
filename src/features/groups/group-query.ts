@@ -6,6 +6,8 @@ import {
   getInvitePreview,
 } from '@/features/groups/group.functions'
 
+export type GroupBySlugQueryData = Awaited<ReturnType<typeof getGroupBySlug>>
+
 export function groupsDashboardQueryOptions() {
   return queryOptions({
     queryKey: ['groups', 'dashboard'],

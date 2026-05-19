@@ -42,8 +42,24 @@ import {
   revokeGroupInvite,
   updateMemberRole,
 } from '@/features/groups/group.functions'
+import {
+  applyOptimisticExpenseCreate,
+  applyOptimisticExpenseDelete,
+  applyOptimisticInviteRevoke,
+  applyOptimisticMemberRemoval,
+  applyOptimisticMemberRoleUpdate,
+  applyOptimisticSettlementCreate,
+  applyOptimisticSettlementDelete
+  
+  
+} from '@/features/groups/group-detail-optimistic'
+import type {OptimisticExpenseInput, OptimisticSettlementInput} from '@/features/groups/group-detail-optimistic';
 import type { GroupDetail } from '@/features/groups/group-repository'
-import { groupBySlugQueryOptions } from '@/features/groups/group-query'
+import {
+  groupBySlugQueryOptions
+  
+} from '@/features/groups/group-query'
+import type {GroupBySlugQueryData} from '@/features/groups/group-query';
 import {
   formatDateOnly,
   formatDateTime,
@@ -59,6 +75,9 @@ interface GroupDetailPageProps {
 
 type SplitMode = 'fixed' | 'percentage'
 type MobileSection = 'expense' | 'activity' | 'group'
+type GroupMutationContext = {
+  previousData: GroupBySlugQueryData | undefined
+}
 
 export function GroupDetailPage({
   group,
@@ -67,6 +86,7 @@ export function GroupDetailPage({
 }: GroupDetailPageProps) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const groupQueryKey = groupBySlugQueryOptions(group.slug).queryKey
   const [renameSlug, setRenameSlug] = useState(group.slug)
   const [renameError, setRenameError] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -103,13 +123,68 @@ export function GroupDetailPage({
   const [settlementAmount, setSettlementAmount] = useState('')
   const [settlementNote, setSettlementNote] = useState('')
   const [settlementOccurredOn, setSettlementOccurredOn] = useState('')
-  const [mobileSection, setMobileSection] =
-    useState<MobileSection>('expense')
+  const [mobileSection, setMobileSection] = useState<MobileSection>('expense')
 
   const invalidateGroup = () =>
     queryClient.invalidateQueries({
-      queryKey: groupBySlugQueryOptions(group.slug).queryKey,
+      queryKey: groupQueryKey,
     })
+
+  const rollbackGroupMutation = (context?: GroupMutationContext) => {
+    if (context?.previousData !== undefined) {
+      queryClient.setQueryData(groupQueryKey, context.previousData)
+    }
+  }
+
+  const applyOptimisticGroupMutation = async (
+    updater: (currentGroup: GroupDetail) => GroupDetail,
+  ) => {
+    await queryClient.cancelQueries({ queryKey: groupQueryKey })
+
+    const previousData =
+      queryClient.getQueryData<GroupBySlugQueryData>(groupQueryKey)
+
+    try {
+      queryClient.setQueryData<GroupBySlugQueryData>(
+        groupQueryKey,
+        (current) => {
+          if (!current || current.kind !== 'group') {
+            return current
+          }
+
+          return {
+            ...current,
+            group: updater(current.group),
+          }
+        },
+      )
+    } catch {
+      // Fall back to the server response for invalid client-side drafts.
+    }
+
+    return {
+      previousData,
+    } satisfies GroupMutationContext
+  }
+
+  const resetExpenseForm = () => {
+    setExpenseTitle('')
+    setExpenseNotes('')
+    setExpenseAmount('')
+    setExpenseOccurredOn('')
+    setSplitMode('fixed')
+    setSelectedParticipantIds(group.members.map((member) => member.userId))
+    setPayerAmounts({})
+    setLastEditedPayerUserId(null)
+    setFixedShares({})
+    setPercentageShares({})
+  }
+
+  const resetSettlementForm = () => {
+    setSettlementAmount('')
+    setSettlementNote('')
+    setSettlementOccurredOn('')
+  }
 
   const renameGroupMutation = useMutation({
     mutationFn: () =>
@@ -169,82 +244,80 @@ export function GroupDetailPage({
           inviteId,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (inviteId) => {
       setInviteError(null)
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticInviteRevoke(currentGroup, inviteId),
+      )
     },
-    onError: (error) => {
+    onError: (error, _inviteId, context) => {
+      rollbackGroupMutation(context)
       setInviteError(
         error instanceof Error
           ? error.message
           : 'Could not revoke the invite link.',
       )
     },
+    onSettled: async () => {
+      await invalidateGroup()
+    },
   })
 
   const createExpenseMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (input: OptimisticExpenseInput) =>
       createExpense({
         data: {
           groupId: group.id,
-          title: expenseTitle,
-          notes: expenseNotes,
-          amount: expenseAmount,
-          paidByUserId: expensePaidBy,
-          payerAmounts,
-          splitMode,
-          participantUserIds: selectedParticipantIds,
-          fixedShares,
-          percentageShares,
-          occurredOn: expenseOccurredOn,
+          ...input,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (input) => {
       setExpenseError(null)
-      setExpenseTitle('')
-      setExpenseNotes('')
-      setExpenseAmount('')
-      setExpenseOccurredOn('')
-      setSplitMode('fixed')
-      setSelectedParticipantIds(group.members.map((member) => member.userId))
-      setPayerAmounts({})
-      setLastEditedPayerUserId(null)
-      setFixedShares({})
-      setPercentageShares({})
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticExpenseCreate(currentGroup, currentUserId, input),
+      )
     },
-    onError: (error) => {
+    onSuccess: () => {
+      resetExpenseForm()
+    },
+    onError: (error, _input, context) => {
+      rollbackGroupMutation(context)
       setExpenseError(
         error instanceof Error ? error.message : 'Could not save the expense.',
       )
     },
+    onSettled: async () => {
+      await invalidateGroup()
+    },
   })
 
   const createSettlementMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (input: OptimisticSettlementInput) =>
       createSettlement({
         data: {
           groupId: group.id,
-          fromUserId: settlementFromUserId,
-          toUserId: settlementToUserId,
-          amount: settlementAmount,
-          note: settlementNote,
-          occurredOn: settlementOccurredOn,
+          ...input,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (input) => {
       setSettlementError(null)
-      setSettlementAmount('')
-      setSettlementNote('')
-      setSettlementOccurredOn('')
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticSettlementCreate(currentGroup, currentUserId, input),
+      )
     },
-    onError: (error) => {
+    onSuccess: () => {
+      resetSettlementForm()
+    },
+    onError: (error, _input, context) => {
+      rollbackGroupMutation(context)
       setSettlementError(
         error instanceof Error
           ? error.message
           : 'Could not record the settlement.',
       )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
     },
   })
 
@@ -256,16 +329,22 @@ export function GroupDetailPage({
           expenseId,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (expenseId) => {
       setExpenseError(null)
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticExpenseDelete(currentGroup, currentUserId, expenseId),
+      )
     },
-    onError: (error) => {
+    onError: (error, _expenseId, context) => {
+      rollbackGroupMutation(context)
       setExpenseError(
         error instanceof Error
           ? error.message
           : 'Could not delete the expense.',
       )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
     },
   })
 
@@ -277,16 +356,26 @@ export function GroupDetailPage({
           settlementId,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (settlementId) => {
       setSettlementError(null)
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticSettlementDelete(
+          currentGroup,
+          currentUserId,
+          settlementId,
+        ),
+      )
     },
-    onError: (error) => {
+    onError: (error, _settlementId, context) => {
+      rollbackGroupMutation(context)
       setSettlementError(
         error instanceof Error
           ? error.message
           : 'Could not delete the settlement.',
       )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
     },
   })
 
@@ -305,16 +394,27 @@ export function GroupDetailPage({
           role,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (input) => {
       setMemberError(null)
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticMemberRoleUpdate(
+          currentGroup,
+          currentUserId,
+          input.memberUserId,
+          input.role,
+        ),
+      )
     },
-    onError: (error) => {
+    onError: (error, _input, context) => {
+      rollbackGroupMutation(context)
       setMemberError(
         error instanceof Error
           ? error.message
           : 'Could not update the member role.',
       )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
     },
   })
 
@@ -326,16 +426,22 @@ export function GroupDetailPage({
           memberUserId,
         },
       }),
-    onSuccess: async () => {
+    onMutate: async (memberUserId) => {
       setMemberError(null)
-      await invalidateGroup()
+      return applyOptimisticGroupMutation((currentGroup) =>
+        applyOptimisticMemberRemoval(currentGroup, currentUserId, memberUserId),
+      )
     },
-    onError: (error) => {
+    onError: (error, _memberUserId, context) => {
+      rollbackGroupMutation(context)
       setMemberError(
         error instanceof Error
           ? error.message
           : 'Could not remove that member.',
       )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
     },
   })
 
@@ -455,9 +561,12 @@ export function GroupDetailPage({
 
   const exportableEntries = useMemo(
     () =>
-      group.ledgerEntries.slice().sort(
-        (left, right) => right.occurredAt.valueOf() - left.occurredAt.valueOf(),
-      ),
+      group.ledgerEntries
+        .slice()
+        .sort(
+          (left, right) =>
+            right.occurredAt.valueOf() - left.occurredAt.valueOf(),
+        ),
     [group.ledgerEntries],
   )
 
@@ -660,758 +769,789 @@ export function GroupDetailPage({
               mobileSection === 'group' && 'hidden xl:block',
             )}
           >
-
-          <Card
-            className={cn(
-              'border-border/70 bg-card/75',
-              mobileSection !== 'expense' && 'hidden xl:flex',
-            )}
-          >
-            <CardHeader className="gap-2">
-              <CardTitle>Add an expense</CardTitle>
-              <CardDescription>
-                Capture the spend first. Splits and balances update from here.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="grid gap-4"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  createExpenseMutation.mutate()
-                }}
-              >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <FieldLabel htmlFor="expense-title">Title</FieldLabel>
-                    <TextInput
-                      id="expense-title"
-                      value={expenseTitle}
-                      onChange={(event) => setExpenseTitle(event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="expense-amount">Amount</FieldLabel>
-                    <TextInput
-                      id="expense-amount"
-                      value={expenseAmount}
-                      onChange={(event) => {
-                        const nextAmount = event.target.value
-                        setExpenseAmount(nextAmount)
-                        setPayerAmounts((current) =>
-                          rebalanceTwoParticipantPayers(
-                            current,
-                            lastEditedPayerUserId,
-                            selectedParticipantIds,
-                            nextAmount,
-                          ),
-                        )
-                      }}
-                      placeholder="1250"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="expense-date">Date</FieldLabel>
-                    <TextInput
-                      id="expense-date"
-                      type="date"
-                      value={expenseOccurredOn}
-                      onChange={(event) =>
-                        setExpenseOccurredOn(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="expense-paid-by">
-                      Default payer
-                    </FieldLabel>
-                    <SelectInput
-                      id="expense-paid-by"
-                      value={expensePaidBy}
-                      onChange={(event) => setExpensePaidBy(event.target.value)}
-                    >
-                      {memberOptions.map((member) => (
-                        <option key={member.value} value={member.value}>
-                          {member.label}
-                        </option>
-                      ))}
-                    </SelectInput>
-                    <FieldHint>
-                      Used as the default payer if you do not split the payment
-                      below.
-                    </FieldHint>
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="split-mode">Split mode</FieldLabel>
-                    <SelectInput
-                      id="split-mode"
-                      value={splitMode}
-                      onChange={(event) => {
-                        const nextSplitMode = event.target.value as SplitMode
-                        setSplitMode(nextSplitMode)
-
-                        if (nextSplitMode === 'percentage') {
-                          setPercentageShares((current) => {
-                            const hasAllSelectedValues =
-                              selectedParticipantIds.every((participantId) =>
-                                current[participantId].trim(),
-                              )
-
-                            return hasAllSelectedValues
-                              ? current
-                              : buildEqualPercentageValues(
-                                  selectedParticipantIds,
-                                )
-                          })
+            <Card
+              className={cn(
+                'border-border/70 bg-card/75',
+                mobileSection !== 'expense' && 'hidden xl:flex',
+              )}
+            >
+              <CardHeader className="gap-2">
+                <CardTitle>Add an expense</CardTitle>
+                <CardDescription>
+                  Capture the spend first. Splits and balances update from here.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="grid gap-4"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    createExpenseMutation.mutate({
+                      title: expenseTitle,
+                      notes: expenseNotes,
+                      amount: expenseAmount,
+                      paidByUserId: expensePaidBy,
+                      payerAmounts,
+                      splitMode,
+                      participantUserIds: selectedParticipantIds,
+                      fixedShares,
+                      percentageShares,
+                      occurredOn: expenseOccurredOn,
+                    })
+                  }}
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <FieldLabel htmlFor="expense-title">Title</FieldLabel>
+                      <TextInput
+                        id="expense-title"
+                        value={expenseTitle}
+                        onChange={(event) =>
+                          setExpenseTitle(event.target.value)
                         }
-                      }}
-                    >
-                      <option value="fixed">Fixed amounts</option>
-                      <option value="percentage">Percentages</option>
-                    </SelectInput>
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="expense-amount">Amount</FieldLabel>
+                      <TextInput
+                        id="expense-amount"
+                        value={expenseAmount}
+                        onChange={(event) => {
+                          const nextAmount = event.target.value
+                          setExpenseAmount(nextAmount)
+                          setPayerAmounts((current) =>
+                            rebalanceTwoParticipantPayers(
+                              current,
+                              lastEditedPayerUserId,
+                              selectedParticipantIds,
+                              nextAmount,
+                            ),
+                          )
+                        }}
+                        placeholder="1250"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="expense-date">Date</FieldLabel>
+                      <TextInput
+                        id="expense-date"
+                        type="date"
+                        value={expenseOccurredOn}
+                        onChange={(event) =>
+                          setExpenseOccurredOn(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="expense-paid-by">
+                        Default payer
+                      </FieldLabel>
+                      <SelectInput
+                        id="expense-paid-by"
+                        value={expensePaidBy}
+                        onChange={(event) =>
+                          setExpensePaidBy(event.target.value)
+                        }
+                      >
+                        {memberOptions.map((member) => (
+                          <option key={member.value} value={member.value}>
+                            {member.label}
+                          </option>
+                        ))}
+                      </SelectInput>
+                      <FieldHint>
+                        Used as the default payer if you do not split the
+                        payment below.
+                      </FieldHint>
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="split-mode">Split mode</FieldLabel>
+                      <SelectInput
+                        id="split-mode"
+                        value={splitMode}
+                        onChange={(event) => {
+                          const nextSplitMode = event.target.value as SplitMode
+                          setSplitMode(nextSplitMode)
+
+                          if (nextSplitMode === 'percentage') {
+                            setPercentageShares((current) => {
+                              const hasAllSelectedValues =
+                                selectedParticipantIds.every((participantId) =>
+                                  current[participantId].trim(),
+                                )
+
+                              return hasAllSelectedValues
+                                ? current
+                                : buildEqualPercentageValues(
+                                    selectedParticipantIds,
+                                  )
+                            })
+                          }
+                        }}
+                      >
+                        <option value="fixed">Fixed amounts</option>
+                        <option value="percentage">Percentages</option>
+                      </SelectInput>
+                      <FieldHint>
+                        Split the expense by amount or by percentage.
+                      </FieldHint>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldLabel>Who paid</FieldLabel>
+                      <span className="text-xs text-muted-foreground">
+                        Amounts must add up to the total
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {group.members.map((member) => (
+                        <div
+                          key={member.userId}
+                          className="grid gap-2 sm:grid-cols-[1fr_140px] sm:items-center"
+                        >
+                          <div className="text-sm font-medium text-foreground">
+                            {member.displayName}
+                          </div>
+                          <TextInput
+                            value={payerAmounts[member.userId] || ''}
+                            onChange={(event) => {
+                              const nextValue = event.target.value
+                              setLastEditedPayerUserId(member.userId)
+                              setPayerAmounts((current) =>
+                                rebalanceTwoParticipantPayers(
+                                  {
+                                    ...current,
+                                    [member.userId]: nextValue,
+                                  },
+                                  member.userId,
+                                ),
+                              )
+                            }}
+                            placeholder={
+                              member.userId === expensePaidBy
+                                ? expenseAmount || '0'
+                                : '0'
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
                     <FieldHint>
-                      Split the expense by amount or by percentage.
+                      Leave this blank to treat the selected payer as having
+                      paid the full amount. With two participants, the second
+                      payer auto-fills from the remaining amount.
                     </FieldHint>
                   </div>
-                </div>
 
-                <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <FieldLabel>Who paid</FieldLabel>
-                    <span className="text-xs text-muted-foreground">
-                      Amounts must add up to the total
-                    </span>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {group.members.map((member) => (
-                      <div
-                        key={member.userId}
-                        className="grid gap-2 sm:grid-cols-[1fr_140px] sm:items-center"
-                      >
-                        <div className="text-sm font-medium text-foreground">
-                          {member.displayName}
-                        </div>
-                        <TextInput
-                          value={payerAmounts[member.userId] || ''}
-                          onChange={(event) => {
-                            const nextValue = event.target.value
-                            setLastEditedPayerUserId(member.userId)
-                            setPayerAmounts((current) =>
-                              rebalanceTwoParticipantPayers(
-                                {
-                                  ...current,
-                                  [member.userId]: nextValue,
-                                },
-                                member.userId,
-                              ),
-                            )
-                          }}
-                          placeholder={
-                            member.userId === expensePaidBy
-                              ? expenseAmount || '0'
-                              : '0'
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <FieldHint>
-                    Leave this blank to treat the selected payer as having paid
-                    the full amount. With two participants, the second payer
-                    auto-fills from the remaining amount.
-                  </FieldHint>
-                </div>
+                  <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldLabel>Participants</FieldLabel>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedParticipantIds.length} selected
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {group.members.map((member) => {
+                        const checked = selectedParticipantIds.includes(
+                          member.userId,
+                        )
+                        return (
+                          <label
+                            key={member.userId}
+                            className="flex items-center gap-3 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => {
+                                setSelectedParticipantIds((current) => {
+                                  const nextParticipantIds = event.target
+                                    .checked
+                                    ? [...current, member.userId]
+                                    : current.filter(
+                                        (value) => value !== member.userId,
+                                      )
 
-                <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <FieldLabel>Participants</FieldLabel>
-                    <span className="text-xs text-muted-foreground">
-                      {selectedParticipantIds.length} selected
-                    </span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {group.members.map((member) => {
-                      const checked = selectedParticipantIds.includes(
-                        member.userId,
-                      )
-                      return (
-                        <label
-                          key={member.userId}
-                          className="flex items-center gap-3 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => {
-                              setSelectedParticipantIds((current) => {
-                                const nextParticipantIds = event.target.checked
-                                  ? [...current, member.userId]
-                                  : current.filter(
-                                      (value) => value !== member.userId,
+                                  if (splitMode === 'percentage') {
+                                    setPercentageShares(
+                                      buildEqualPercentageValues(
+                                        nextParticipantIds,
+                                      ),
                                     )
+                                  }
 
-                                if (splitMode === 'percentage') {
-                                  setPercentageShares(
-                                    buildEqualPercentageValues(
+                                  setPayerAmounts((currentPayerAmounts) =>
+                                    rebalanceTwoParticipantPayers(
+                                      currentPayerAmounts,
+                                      lastEditedPayerUserId,
                                       nextParticipantIds,
                                     ),
                                   )
-                                }
 
-                                setPayerAmounts((currentPayerAmounts) =>
-                                  rebalanceTwoParticipantPayers(
-                                    currentPayerAmounts,
-                                    lastEditedPayerUserId,
-                                    nextParticipantIds,
-                                  ),
-                                )
+                                  return nextParticipantIds
+                                })
+                              }}
+                            />
+                            <span>{member.displayName}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <FieldHint>
+                      Choose which members should share this expense.
+                    </FieldHint>
+                  </div>
 
-                                return nextParticipantIds
-                              })
+                  <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
+                    {selectedParticipantIds.map((participantId) => {
+                      const member = group.members.find(
+                        (item) => item.userId === participantId,
+                      )
+                      if (!member) {
+                        return null
+                      }
+
+                      const valueMap =
+                        splitMode === 'fixed' ? fixedShares : percentageShares
+
+                      return (
+                        <div
+                          key={participantId}
+                          className="grid gap-2 sm:grid-cols-[1fr_160px] sm:items-center"
+                        >
+                          <div className="text-sm font-medium text-foreground">
+                            {member.displayName}
+                          </div>
+                          <TextInput
+                            value={valueMap[participantId] || ''}
+                            onChange={(event) => {
+                              const nextValue = event.target.value
+                              if (splitMode === 'fixed') {
+                                setFixedShares((current) => ({
+                                  ...current,
+                                  [participantId]: nextValue,
+                                }))
+                              } else {
+                                setPercentageShares((current) => ({
+                                  ...current,
+                                  [participantId]: nextValue,
+                                }))
+                              }
                             }}
+                            placeholder={splitMode === 'fixed' ? '250' : '25'}
                           />
-                          <span>{member.displayName}</span>
-                        </label>
+                        </div>
                       )
                     })}
+                    <FieldHint>
+                      {splitMode === 'fixed'
+                        ? 'Amounts must add up to the total.'
+                        : 'Percentages must add up to 100.'}
+                    </FieldHint>
                   </div>
-                  <FieldHint>
-                    Choose which members should share this expense.
-                  </FieldHint>
+
+                  <details className="rounded-[1.25rem] border border-border/70 bg-background/70 p-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="list-none cursor-pointer text-sm font-medium text-foreground">
+                      Add a note
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      <FieldLabel htmlFor="expense-notes">Notes</FieldLabel>
+                      <TextArea
+                        id="expense-notes"
+                        value={expenseNotes}
+                        onChange={(event) =>
+                          setExpenseNotes(event.target.value)
+                        }
+                      />
+                    </div>
+                  </details>
+
+                  {expenseError ? (
+                    <FormMessage>{expenseError}</FormMessage>
+                  ) : null}
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={createExpenseMutation.isPending}
+                    >
+                      {createExpenseMutation.isPending
+                        ? 'Saving...'
+                        : 'Save expense'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card
+              id="activity-section"
+              className={cn(
+                'border-border/70 bg-card/70',
+                mobileSection !== 'activity' && 'hidden xl:flex',
+              )}
+            >
+              <CardHeader className="gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>Recent activity</CardTitle>
+                    <CardDescription>
+                      Latest expenses and settle-ups.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="text-xs text-muted-foreground">
+                      {group.ledgerEntries.length
+                        ? `${group.ledgerEntries.length} total`
+                        : 'No entries yet'}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={downloadActivityCsv}
+                      disabled={!exportableEntries.length}
+                    >
+                      <DownloadIcon className="size-4" />
+                      Download CSV
+                    </Button>
+                  </div>
                 </div>
-
-                <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
-                  {selectedParticipantIds.map((participantId) => {
-                    const member = group.members.find(
-                      (item) => item.userId === participantId,
-                    )
-                    if (!member) {
-                      return null
-                    }
-
-                    const valueMap =
-                      splitMode === 'fixed' ? fixedShares : percentageShares
-
-                    return (
-                      <div
-                        key={participantId}
-                        className="grid gap-2 sm:grid-cols-[1fr_160px] sm:items-center"
-                      >
-                        <div className="text-sm font-medium text-foreground">
-                          {member.displayName}
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {recentLedgerEntries.length ? (
+                  recentLedgerEntries.map((entry) => (
+                    <div
+                      key={`${entry.type}-${entry.id}`}
+                      className="rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground">
+                            {entry.title}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {entry.subtitle}
+                          </div>
                         </div>
-                        <TextInput
-                          value={valueMap[participantId] || ''}
-                          onChange={(event) => {
-                            const nextValue = event.target.value
-                            if (splitMode === 'fixed') {
-                              setFixedShares((current) => ({
-                                ...current,
-                                [participantId]: nextValue,
-                              }))
-                            } else {
-                              setPercentageShares((current) => ({
-                                ...current,
-                                [participantId]: nextValue,
-                              }))
-                            }
-                          }}
-                          placeholder={splitMode === 'fixed' ? '250' : '25'}
-                        />
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-foreground">
+                              {formatMinorAmount(
+                                entry.amountMinor,
+                                entry.currencyCode,
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(entry.occurredAt)}
+                            </div>
+                          </div>
+                          {entry.canManage ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (entry.type === 'expense') {
+                                  deleteExpenseMutation.mutate(entry.id)
+                                } else {
+                                  deleteSettlementMutation.mutate(entry.id)
+                                }
+                              }}
+                            >
+                              <Trash2Icon className="size-4" />
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
-                    )
-                  })}
-                  <FieldHint>
-                    {splitMode === 'fixed'
-                      ? 'Amounts must add up to the total.'
-                      : 'Percentages must add up to 100.'}
-                  </FieldHint>
-                </div>
-
-                <details className="rounded-[1.25rem] border border-border/70 bg-background/70 p-4 [&_summary::-webkit-details-marker]:hidden">
-                  <summary className="list-none cursor-pointer text-sm font-medium text-foreground">
-                    Add a note
-                  </summary>
-                  <div className="mt-3 space-y-2">
-                    <FieldLabel htmlFor="expense-notes">Notes</FieldLabel>
-                    <TextArea
-                      id="expense-notes"
-                      value={expenseNotes}
-                      onChange={(event) => setExpenseNotes(event.target.value)}
-                    />
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/70 p-5 text-sm leading-6 text-muted-foreground">
+                    No activity yet. Your first expense will show up here.
                   </div>
-                </details>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-                {expenseError ? (
-                  <FormMessage>{expenseError}</FormMessage>
-                ) : null}
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    size="lg"
-                    disabled={createExpenseMutation.isPending}
-                  >
-                    {createExpenseMutation.isPending
-                      ? 'Saving...'
-                      : 'Save expense'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card
-            id="activity-section"
+          <div
+            id="group-section"
             className={cn(
-              'border-border/70 bg-card/70',
-              mobileSection !== 'activity' && 'hidden xl:flex',
+              'space-y-5',
+              mobileSection !== 'group' && 'hidden xl:block',
             )}
           >
-            <CardHeader className="gap-2">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Recent activity</CardTitle>
-                  <CardDescription>
-                    Latest expenses and settle-ups.
-                  </CardDescription>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="text-xs text-muted-foreground">
-                    {group.ledgerEntries.length
-                      ? `${group.ledgerEntries.length} total`
-                      : 'No entries yet'}
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={downloadActivityCsv}
-                    disabled={!exportableEntries.length}
-                  >
-                    <DownloadIcon className="size-4" />
-                    Download CSV
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {recentLedgerEntries.length ? (
-                recentLedgerEntries.map((entry) => (
+            <Card size="sm" className="border-border/70 bg-card/75">
+              <CardHeader className="gap-1">
+                <CardTitle>Balances</CardTitle>
+                <CardDescription>
+                  Current position for each member.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                {group.balances.map((balance) => (
                   <div
-                    key={`${entry.type}-${entry.id}`}
-                    className="rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-3"
+                    key={balance.userId}
+                    className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium text-foreground">
-                          {entry.title}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {entry.subtitle}
-                        </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">
+                        {balance.displayName}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-foreground">
-                            {formatMinorAmount(
-                              entry.amountMinor,
-                              entry.currencyCode,
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDateTime(entry.occurredAt)}
-                          </div>
-                        </div>
-                        {entry.canManage ? (
+                      <div className="text-xs text-muted-foreground">
+                        @{balance.userLogin}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {formatMinorAmount(
+                        balance.balanceMinor,
+                        group.currencyCode,
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card size="sm" className="border-border/70 bg-card/75">
+              <CardHeader className="gap-1">
+                <CardTitle>Group</CardTitle>
+                <CardDescription>
+                  {group.role === 'owner'
+                    ? 'You can manage this group.'
+                    : 'You are participating in this group.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                  <span>Slug</span>
+                  <span className="font-medium text-foreground">
+                    /{group.slug}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                  <span>Members</span>
+                  <span className="font-medium text-foreground">
+                    {group.members.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                  <span>Currency</span>
+                  <span className="font-medium text-foreground">
+                    {group.currencyCode}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
+              <summary className="list-none cursor-pointer">
+                <div className="space-y-1">
+                  <div className="font-medium text-foreground">
+                    Record settlement
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Use this when someone pays another member back directly.
+                  </div>
+                </div>
+              </summary>
+              <div className="mt-4">
+                {canRecordSettlement ? (
+                  <form
+                    className="grid gap-4 md:grid-cols-2"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      createSettlementMutation.mutate({
+                        fromUserId: settlementFromUserId,
+                        toUserId: settlementToUserId,
+                        amount: settlementAmount,
+                        note: settlementNote,
+                        occurredOn: settlementOccurredOn,
+                      })
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="settlement-from">Paid by</FieldLabel>
+                      <SelectInput
+                        id="settlement-from"
+                        value={settlementFromUserId}
+                        onChange={(event) =>
+                          setSettlementFromUserId(event.target.value)
+                        }
+                      >
+                        {memberOptions.map((member) => (
+                          <option key={member.value} value={member.value}>
+                            {member.label}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="settlement-to">
+                        Received by
+                      </FieldLabel>
+                      <SelectInput
+                        id="settlement-to"
+                        value={settlementToUserId}
+                        onChange={(event) =>
+                          setSettlementToUserId(event.target.value)
+                        }
+                      >
+                        {memberOptions.map((member) => (
+                          <option key={member.value} value={member.value}>
+                            {member.label}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="settlement-amount">
+                        Amount
+                      </FieldLabel>
+                      <TextInput
+                        id="settlement-amount"
+                        value={settlementAmount}
+                        onChange={(event) =>
+                          setSettlementAmount(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel htmlFor="settlement-date">Date</FieldLabel>
+                      <TextInput
+                        id="settlement-date"
+                        type="date"
+                        value={settlementOccurredOn}
+                        onChange={(event) =>
+                          setSettlementOccurredOn(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <FieldLabel htmlFor="settlement-note">Note</FieldLabel>
+                      <TextInput
+                        id="settlement-note"
+                        value={settlementNote}
+                        onChange={(event) =>
+                          setSettlementNote(event.target.value)
+                        }
+                      />
+                    </div>
+
+                    {settlementError ? (
+                      <FormMessage className="md:col-span-2">
+                        {settlementError}
+                      </FormMessage>
+                    ) : null}
+
+                    <div className="md:col-span-2 flex justify-end">
+                      <Button
+                        type="submit"
+                        disabled={createSettlementMutation.isPending}
+                      >
+                        {createSettlementMutation.isPending
+                          ? 'Saving...'
+                          : 'Save settlement'}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="rounded-[1rem] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
+                    Add another member before recording settlements.
+                  </div>
+                )}
+              </div>
+            </details>
+
+            <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
+              <summary className="list-none cursor-pointer">
+                <div className="space-y-1">
+                  <div className="font-medium text-foreground">
+                    Members and settings
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Owner tools, invites, and member management.
+                  </div>
+                </div>
+              </summary>
+              <div className="mt-4 space-y-4">
+                {group.members.map((member) => (
+                  <div
+                    key={member.userId}
+                    className="flex flex-col gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">
+                        {member.displayName}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        @{member.userLogin}
+                      </div>
+                    </div>
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                      <Badge
+                        variant={
+                          member.role === 'owner' ? 'accent' : 'secondary'
+                        }
+                      >
+                        {member.role}
+                      </Badge>
+                      {group.role === 'owner' &&
+                      member.userId !== currentUserId ? (
+                        <>
                           <Button
                             type="button"
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              if (entry.type === 'expense') {
-                                deleteExpenseMutation.mutate(entry.id)
-                              } else {
-                                deleteSettlementMutation.mutate(entry.id)
-                              }
-                            }}
+                            onClick={() =>
+                              updateMemberRoleMutation.mutate({
+                                memberUserId: member.userId,
+                                role:
+                                  member.role === 'owner' ? 'member' : 'owner',
+                              })
+                            }
+                          >
+                            {member.role === 'owner'
+                              ? 'Make member'
+                              : 'Make owner'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              removeMemberMutation.mutate(member.userId)
+                            }
                           >
                             <Trash2Icon className="size-4" />
                           </Button>
-                        ) : null}
-                      </div>
+                        </>
+                      ) : null}
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/70 p-5 text-sm leading-6 text-muted-foreground">
-                  No activity yet. Your first expense will show up here.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                ))}
+                {memberError ? <FormMessage>{memberError}</FormMessage> : null}
 
-        <div
-          id="group-section"
-          className={cn(
-            'space-y-5',
-            mobileSection !== 'group' && 'hidden xl:block',
-          )}
-        >
-          <Card size="sm" className="border-border/70 bg-card/75">
-            <CardHeader className="gap-1">
-              <CardTitle>Balances</CardTitle>
-              <CardDescription>
-                Current position for each member.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2">
-              {group.balances.map((balance) => (
-                <div
-                  key={balance.userId}
-                  className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-foreground">
-                      {balance.displayName}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      @{balance.userLogin}
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-foreground">
-                    {formatMinorAmount(
-                      balance.balanceMinor,
-                      group.currencyCode,
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card size="sm" className="border-border/70 bg-card/75">
-            <CardHeader className="gap-1">
-              <CardTitle>Group</CardTitle>
-              <CardDescription>
-                {group.role === 'owner'
-                  ? 'You can manage this group.'
-                  : 'You are participating in this group.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
-                <span>Slug</span>
-                <span className="font-medium text-foreground">
-                  /{group.slug}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
-                <span>Members</span>
-                <span className="font-medium text-foreground">
-                  {group.members.length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
-                <span>Currency</span>
-                <span className="font-medium text-foreground">
-                  {group.currencyCode}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
-            <summary className="list-none cursor-pointer">
-              <div className="space-y-1">
-                <div className="font-medium text-foreground">
-                  Record settlement
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Use this when someone pays another member back directly.
-                </div>
-              </div>
-            </summary>
-            <div className="mt-4">
-              {canRecordSettlement ? (
-                <form
-                  className="grid gap-4 md:grid-cols-2"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    createSettlementMutation.mutate()
-                  }}
-                >
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="settlement-from">Paid by</FieldLabel>
-                    <SelectInput
-                      id="settlement-from"
-                      value={settlementFromUserId}
-                      onChange={(event) =>
-                        setSettlementFromUserId(event.target.value)
-                      }
-                    >
-                      {memberOptions.map((member) => (
-                        <option key={member.value} value={member.value}>
-                          {member.label}
-                        </option>
-                      ))}
-                    </SelectInput>
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="settlement-to">Received by</FieldLabel>
-                    <SelectInput
-                      id="settlement-to"
-                      value={settlementToUserId}
-                      onChange={(event) =>
-                        setSettlementToUserId(event.target.value)
-                      }
-                    >
-                      {memberOptions.map((member) => (
-                        <option key={member.value} value={member.value}>
-                          {member.label}
-                        </option>
-                      ))}
-                    </SelectInput>
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="settlement-amount">Amount</FieldLabel>
-                    <TextInput
-                      id="settlement-amount"
-                      value={settlementAmount}
-                      onChange={(event) =>
-                        setSettlementAmount(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <FieldLabel htmlFor="settlement-date">Date</FieldLabel>
-                    <TextInput
-                      id="settlement-date"
-                      type="date"
-                      value={settlementOccurredOn}
-                      onChange={(event) =>
-                        setSettlementOccurredOn(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <FieldLabel htmlFor="settlement-note">Note</FieldLabel>
-                    <TextInput
-                      id="settlement-note"
-                      value={settlementNote}
-                      onChange={(event) =>
-                        setSettlementNote(event.target.value)
-                      }
-                    />
-                  </div>
-
-                  {settlementError ? (
-                    <FormMessage className="md:col-span-2">
-                      {settlementError}
-                    </FormMessage>
-                  ) : null}
-
-                  <div className="md:col-span-2 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={createSettlementMutation.isPending}
-                    >
-                      {createSettlementMutation.isPending
-                        ? 'Saving...'
-                        : 'Save settlement'}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div className="rounded-[1rem] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-                  Add another member before recording settlements.
-                </div>
-              )}
-            </div>
-          </details>
-
-          <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
-            <summary className="list-none cursor-pointer">
-              <div className="space-y-1">
-                <div className="font-medium text-foreground">
-                  Members and settings
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Owner tools, invites, and member management.
-                </div>
-              </div>
-            </summary>
-            <div className="mt-4 space-y-4">
-              {group.members.map((member) => (
-                <div
-                  key={member.userId}
-                  className="flex flex-col gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-foreground">
-                      {member.displayName}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      @{member.userLogin}
-                    </div>
-                  </div>
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-                    <Badge
-                      variant={member.role === 'owner' ? 'accent' : 'secondary'}
-                    >
-                      {member.role}
-                    </Badge>
-                    {group.role === 'owner' &&
-                    member.userId !== currentUserId ? (
-                      <>
+                {group.role === 'owner' ? (
+                  <>
+                    <div className="space-y-2 border-t border-border/60 pt-4">
+                      <FieldLabel htmlFor="rename-group-slug">
+                        Rename slug
+                      </FieldLabel>
+                      <div className="flex gap-2">
+                        <TextInput
+                          id="rename-group-slug"
+                          value={renameSlug}
+                          onChange={(event) =>
+                            setRenameSlug(event.target.value)
+                          }
+                        />
                         <Button
                           type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            updateMemberRoleMutation.mutate({
-                              memberUserId: member.userId,
-                              role:
-                                member.role === 'owner' ? 'member' : 'owner',
-                            })
-                          }
+                          variant="outline"
+                          disabled={renameGroupMutation.isPending}
+                          onClick={() => renameGroupMutation.mutate()}
                         >
-                          {member.role === 'owner'
-                            ? 'Make member'
-                            : 'Make owner'}
+                          <RefreshCwIcon className="size-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            removeMemberMutation.mutate(member.userId)
-                          }
-                        >
-                          <Trash2Icon className="size-4" />
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-              {memberError ? <FormMessage>{memberError}</FormMessage> : null}
-
-              {group.role === 'owner' ? (
-                <>
-                  <div className="space-y-2 border-t border-border/60 pt-4">
-                    <FieldLabel htmlFor="rename-group-slug">
-                      Rename slug
-                    </FieldLabel>
-                    <div className="flex gap-2">
-                      <TextInput
-                        id="rename-group-slug"
-                        value={renameSlug}
-                        onChange={(event) => setRenameSlug(event.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={renameGroupMutation.isPending}
-                        onClick={() => renameGroupMutation.mutate()}
-                      >
-                        <RefreshCwIcon className="size-4" />
-                      </Button>
-                    </div>
-                    <FieldHint>
-                      Older slugs stay reserved in history and keep redirecting.
-                    </FieldHint>
-                    {renameError ? (
-                      <FormMessage>{renameError}</FormMessage>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2 rounded-[1rem] border border-border/70 bg-background/75 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="font-medium text-foreground">
-                          Invite links
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Reusable by default. New links expire in 7 days.
-                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        onClick={() => createInviteMutation.mutate()}
-                        disabled={createInviteMutation.isPending}
-                      >
-                        <LinkIcon className="size-4" />
-                        Create
-                      </Button>
+                      <FieldHint>
+                        Older slugs stay reserved in history and keep
+                        redirecting.
+                      </FieldHint>
+                      {renameError ? (
+                        <FormMessage>{renameError}</FormMessage>
+                      ) : null}
                     </div>
-                    {inviteError ? (
-                      <FormMessage>{inviteError}</FormMessage>
-                    ) : null}
-                    {visibleInvites.length ? (
-                      <div className="grid gap-2 pt-2">
-                        {visibleInvites.map((invite) => (
-                          <div
-                            key={invite.id}
-                            className="flex min-w-0 items-center gap-2 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm"
-                          >
-                            <button
-                              type="button"
-                              className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-left"
-                              onClick={async () => {
-                                const absoluteUrl = `${window.location.origin}${invite.shareUrl}`
-                                try {
-                                  await navigator.clipboard.writeText(
-                                    absoluteUrl,
-                                  )
-                                  showToast(
-                                    `Invite copied: ${absoluteUrl}`,
-                                    'success',
-                                  )
-                                } catch {
-                                  showToast(
-                                    `Could not copy invite link: ${absoluteUrl}`,
-                                    'error',
-                                  )
-                                }
-                              }}
-                            >
-                              <div className="min-w-0 flex-1 overflow-hidden">
-                                <div className="truncate font-medium text-foreground">
-                                  {invite.shareUrl}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {invite.revokedAt
-                                    ? 'Revoked'
-                                    : `Expires ${formatDateOnly(invite.expiresAt)}`}
-                                </div>
-                              </div>
-                              <CopyIcon className="size-4 shrink-0 text-muted-foreground" />
-                            </button>
-                            {!invite.revokedAt ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  revokeInviteMutation.mutate(invite.id)
-                                }
-                              >
-                                <Trash2Icon className="size-4" />
-                              </Button>
-                            ) : null}
+
+                    <div className="space-y-2 rounded-[1rem] border border-border/70 bg-background/75 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="font-medium text-foreground">
+                            Invite links
                           </div>
-                        ))}
+                          <div className="text-sm text-muted-foreground">
+                            Reusable by default. New links expire in 7 days.
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => createInviteMutation.mutate()}
+                          disabled={createInviteMutation.isPending}
+                        >
+                          <LinkIcon className="size-4" />
+                          Create
+                        </Button>
                       </div>
-                    ) : null}
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </details>
-        </div>
-
+                      {inviteError ? (
+                        <FormMessage>{inviteError}</FormMessage>
+                      ) : null}
+                      {visibleInvites.length ? (
+                        <div className="grid gap-2 pt-2">
+                          {visibleInvites.map((invite) => (
+                            <div
+                              key={invite.id}
+                              className="flex min-w-0 items-center gap-2 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm"
+                            >
+                              <button
+                                type="button"
+                                className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden text-left"
+                                onClick={async () => {
+                                  const absoluteUrl = `${window.location.origin}${invite.shareUrl}`
+                                  try {
+                                    await navigator.clipboard.writeText(
+                                      absoluteUrl,
+                                    )
+                                    showToast(
+                                      `Invite copied: ${absoluteUrl}`,
+                                      'success',
+                                    )
+                                  } catch {
+                                    showToast(
+                                      `Could not copy invite link: ${absoluteUrl}`,
+                                      'error',
+                                    )
+                                  }
+                                }}
+                              >
+                                <div className="min-w-0 flex-1 overflow-hidden">
+                                  <div className="truncate font-medium text-foreground">
+                                    {invite.shareUrl}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {invite.revokedAt
+                                      ? 'Revoked'
+                                      : `Expires ${formatDateOnly(invite.expiresAt)}`}
+                                  </div>
+                                </div>
+                                <CopyIcon className="size-4 shrink-0 text-muted-foreground" />
+                              </button>
+                              {!invite.revokedAt ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    revokeInviteMutation.mutate(invite.id)
+                                  }
+                                >
+                                  <Trash2Icon className="size-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </details>
+          </div>
         </div>
 
         <div className="fixed inset-x-4 bottom-4 z-20 sm:hidden">
