@@ -2,3 +2,9 @@ allowBuilds:
   esbuild: true
   msw: true
   unrs-resolver: true
+  lightningcss: true
+minimumReleaseAgeExclude:
+  - '@tanstack/query-core@5.100.11'
+  - '@tanstack/query-devtools@5.100.11'
+  - '@tanstack/react-query-devtools@5.100.11'
+  - '@tanstack/react-query@5.100.11'
