@@ -28,12 +28,8 @@ export interface OptimisticExpenseInput {
   occurredOn?: string
 }
 
-export interface OptimisticSettlementInput {
-  fromUserId: string
-  toUserId: string
-  amount: string
-  note?: string
-  occurredOn?: string
+export interface OptimisticExpenseUpdateInput extends OptimisticExpenseInput {
+  expenseId: string
 }
 
 function createOptimisticId(prefix: string) {
@@ -87,17 +83,14 @@ function rebuildGroupDetail(
   group: GroupDetail,
   currentUserId: string,
   overrides: Partial<{
-    members: GroupDetail['members']
-    invites: GroupDetail['invites']
     expenses: LedgerExpenseRecord[]
-    settlements: LedgerSettlementRecord[]
   }>,
 ) {
   const ledgerRecords = getLedgerRecords(group)
-  const members = overrides.members ?? group.members
-  const invites = overrides.invites ?? group.invites
+  const members = group.members
+  const invites = group.invites
   const expenses = overrides.expenses ?? ledgerRecords.expenses
-  const settlements = overrides.settlements ?? ledgerRecords.settlements
+  const settlements = ledgerRecords.settlements
   const snapshot = buildLedgerSnapshot({
     members,
     expenses,
@@ -107,16 +100,16 @@ function rebuildGroupDetail(
 
   return {
     ...group,
-    members,
     invites,
     ledgerEntries: snapshot.ledgerEntries,
     balances: snapshot.balances,
   }
 }
 
-export function applyOptimisticExpenseCreate(
+function buildOptimisticExpenseRecord(
   group: GroupDetail,
-  currentUserId: string,
+  expenseId: string,
+  createdByUserId: string,
   input: OptimisticExpenseInput,
 ) {
   const title = input.title.trim()
@@ -139,7 +132,7 @@ export function applyOptimisticExpenseCreate(
   assertGroupMembersExist(
     group,
     payers.map((payer) => payer.userId),
-    'Each participant can only appear once.',
+    'Each payer can only appear once.',
   )
 
   const participants =
@@ -155,8 +148,8 @@ export function applyOptimisticExpenseCreate(
             selectShareInputs(participantUserIds, input.percentageShares),
           )
 
-  const expense: LedgerExpenseRecord = {
-    id: createOptimisticId('expense'),
+  return {
+    id: expenseId,
     title,
     notes: input.notes?.trim() || null,
     amountMinor,
@@ -165,9 +158,22 @@ export function applyOptimisticExpenseCreate(
     payers,
     splitMode: input.splitMode,
     occurredAt: ensureIsoDate(input.occurredOn),
-    createdByUserId: currentUserId,
+    createdByUserId,
     participants,
-  }
+  } satisfies LedgerExpenseRecord
+}
+
+export function applyOptimisticExpenseCreate(
+  group: GroupDetail,
+  currentUserId: string,
+  input: OptimisticExpenseInput,
+) {
+  const expense = buildOptimisticExpenseRecord(
+    group,
+    createOptimisticId('expense'),
+    currentUserId,
+    input,
+  )
 
   const { expenses } = getLedgerRecords(group)
 
@@ -193,92 +199,32 @@ export function applyOptimisticExpenseDelete(
   })
 }
 
-export function applyOptimisticSettlementCreate(
+export function applyOptimisticExpenseUpdate(
   group: GroupDetail,
   currentUserId: string,
-  input: OptimisticSettlementInput,
+  input: OptimisticExpenseUpdateInput,
 ) {
-  const [fromUserId, toUserId] = assertGroupMembersExist(
-    group,
-    [input.fromUserId, input.toUserId],
-    'Each participant can only appear once.',
+  const { expenses } = getLedgerRecords(group)
+  const existingExpense = expenses.find(
+    (expense) => expense.id === input.expenseId,
   )
 
-  const settlement: LedgerSettlementRecord = {
-    id: createOptimisticId('settlement'),
-    amountMinor: parseAmountInputToMinorUnits(input.amount),
-    currencyCode: group.currencyCode,
-    fromUserId,
-    toUserId,
-    note: input.note?.trim() || null,
-    occurredAt: ensureIsoDate(input.occurredOn),
-    createdByUserId: currentUserId,
-  }
-
-  const { settlements } = getLedgerRecords(group)
-
-  return rebuildGroupDetail(group, currentUserId, {
-    settlements: [...settlements, settlement],
-  })
-}
-
-export function applyOptimisticSettlementDelete(
-  group: GroupDetail,
-  currentUserId: string,
-  settlementId: string,
-) {
-  const { settlements } = getLedgerRecords(group)
-  const nextSettlements = settlements.filter(
-    (settlement) => settlement.id !== settlementId,
-  )
-
-  if (nextSettlements.length === settlements.length) {
+  if (!existingExpense) {
     return group
   }
 
+  const nextExpenses = expenses.map((expense) =>
+    expense.id === input.expenseId
+      ? buildOptimisticExpenseRecord(
+          group,
+          existingExpense.id,
+          existingExpense.createdByUserId,
+          input,
+        )
+      : expense,
+  )
+
   return rebuildGroupDetail(group, currentUserId, {
-    settlements: nextSettlements,
+    expenses: nextExpenses,
   })
-}
-
-export function applyOptimisticInviteRevoke(
-  group: GroupDetail,
-  inviteId: string,
-) {
-  return {
-    ...group,
-    invites: group.invites.map((invite) =>
-      invite.id === inviteId ? { ...invite, revokedAt: new Date() } : invite,
-    ),
-  }
-}
-
-export function applyOptimisticMemberRoleUpdate(
-  group: GroupDetail,
-  currentUserId: string,
-  memberUserId: string,
-  role: 'owner' | 'member',
-) {
-  const members = group.members.map((member) =>
-    member.userId === memberUserId ? { ...member, role } : member,
-  )
-  const nextGroup = memberUserId === currentUserId ? { ...group, role } : group
-
-  return rebuildGroupDetail(nextGroup, currentUserId, { members })
-}
-
-export function applyOptimisticMemberRemoval(
-  group: GroupDetail,
-  currentUserId: string,
-  memberUserId: string,
-) {
-  const members = group.members.filter(
-    (member) => member.userId !== memberUserId,
-  )
-
-  if (members.length === group.members.length) {
-    return group
-  }
-
-  return rebuildGroupDetail(group, currentUserId, { members })
 }

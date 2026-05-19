@@ -40,20 +40,17 @@ import {
   renameGroup,
   removeGroupMember,
   revokeGroupInvite,
+  updateExpense,
   updateMemberRole,
 } from '@/features/groups/group.functions'
 import {
   applyOptimisticExpenseCreate,
   applyOptimisticExpenseDelete,
-  applyOptimisticInviteRevoke,
-  applyOptimisticMemberRemoval,
-  applyOptimisticMemberRoleUpdate,
-  applyOptimisticSettlementCreate,
-  applyOptimisticSettlementDelete
+  applyOptimisticExpenseUpdate
   
   
 } from '@/features/groups/group-detail-optimistic'
-import type {OptimisticExpenseInput, OptimisticSettlementInput} from '@/features/groups/group-detail-optimistic';
+import type {OptimisticExpenseInput, OptimisticExpenseUpdateInput} from '@/features/groups/group-detail-optimistic';
 import type { GroupDetail } from '@/features/groups/group-repository'
 import {
   groupBySlugQueryOptions
@@ -105,6 +102,7 @@ export function GroupDetailPage({
     string | null
   >(null)
   const [expenseOccurredOn, setExpenseOccurredOn] = useState('')
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
   const [splitMode, setSplitMode] = useState<SplitMode>('fixed')
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<
     string[]
@@ -172,6 +170,7 @@ export function GroupDetailPage({
     setExpenseNotes('')
     setExpenseAmount('')
     setExpenseOccurredOn('')
+    setEditingExpenseId(null)
     setSplitMode('fixed')
     setSelectedParticipantIds(group.members.map((member) => member.userId))
     setPayerAmounts({})
@@ -244,22 +243,16 @@ export function GroupDetailPage({
           inviteId,
         },
       }),
-    onMutate: async (inviteId) => {
+    onSuccess: async () => {
       setInviteError(null)
-      return applyOptimisticGroupMutation((currentGroup) =>
-        applyOptimisticInviteRevoke(currentGroup, inviteId),
-      )
+      await invalidateGroup()
     },
-    onError: (error, _inviteId, context) => {
-      rollbackGroupMutation(context)
+    onError: (error) => {
       setInviteError(
         error instanceof Error
           ? error.message
           : 'Could not revoke the invite link.',
       )
-    },
-    onSettled: async () => {
-      await invalidateGroup()
     },
   })
 
@@ -291,33 +284,59 @@ export function GroupDetailPage({
     },
   })
 
-  const createSettlementMutation = useMutation({
-    mutationFn: (input: OptimisticSettlementInput) =>
-      createSettlement({
+  const updateExpenseMutation = useMutation({
+    mutationFn: (input: OptimisticExpenseUpdateInput) =>
+      updateExpense({
         data: {
           groupId: group.id,
           ...input,
         },
       }),
     onMutate: async (input) => {
-      setSettlementError(null)
+      setExpenseError(null)
       return applyOptimisticGroupMutation((currentGroup) =>
-        applyOptimisticSettlementCreate(currentGroup, currentUserId, input),
+        applyOptimisticExpenseUpdate(currentGroup, currentUserId, input),
       )
     },
     onSuccess: () => {
-      resetSettlementForm()
+      resetExpenseForm()
     },
     onError: (error, _input, context) => {
       rollbackGroupMutation(context)
+      setExpenseError(
+        error instanceof Error
+          ? error.message
+          : 'Could not update the expense.',
+      )
+    },
+    onSettled: async () => {
+      await invalidateGroup()
+    },
+  })
+
+  const createSettlementMutation = useMutation({
+    mutationFn: () =>
+      createSettlement({
+        data: {
+          groupId: group.id,
+          fromUserId: settlementFromUserId,
+          toUserId: settlementToUserId,
+          amount: settlementAmount,
+          note: settlementNote,
+          occurredOn: settlementOccurredOn,
+        },
+      }),
+    onSuccess: async () => {
+      setSettlementError(null)
+      resetSettlementForm()
+      await invalidateGroup()
+    },
+    onError: (error) => {
       setSettlementError(
         error instanceof Error
           ? error.message
           : 'Could not record the settlement.',
       )
-    },
-    onSettled: async () => {
-      await invalidateGroup()
     },
   })
 
@@ -356,26 +375,16 @@ export function GroupDetailPage({
           settlementId,
         },
       }),
-    onMutate: async (settlementId) => {
+    onSuccess: async () => {
       setSettlementError(null)
-      return applyOptimisticGroupMutation((currentGroup) =>
-        applyOptimisticSettlementDelete(
-          currentGroup,
-          currentUserId,
-          settlementId,
-        ),
-      )
+      await invalidateGroup()
     },
-    onError: (error, _settlementId, context) => {
-      rollbackGroupMutation(context)
+    onError: (error) => {
       setSettlementError(
         error instanceof Error
           ? error.message
           : 'Could not delete the settlement.',
       )
-    },
-    onSettled: async () => {
-      await invalidateGroup()
     },
   })
 
@@ -394,27 +403,16 @@ export function GroupDetailPage({
           role,
         },
       }),
-    onMutate: async (input) => {
+    onSuccess: async () => {
       setMemberError(null)
-      return applyOptimisticGroupMutation((currentGroup) =>
-        applyOptimisticMemberRoleUpdate(
-          currentGroup,
-          currentUserId,
-          input.memberUserId,
-          input.role,
-        ),
-      )
+      await invalidateGroup()
     },
-    onError: (error, _input, context) => {
-      rollbackGroupMutation(context)
+    onError: (error) => {
       setMemberError(
         error instanceof Error
           ? error.message
           : 'Could not update the member role.',
       )
-    },
-    onSettled: async () => {
-      await invalidateGroup()
     },
   })
 
@@ -426,22 +424,16 @@ export function GroupDetailPage({
           memberUserId,
         },
       }),
-    onMutate: async (memberUserId) => {
+    onSuccess: async () => {
       setMemberError(null)
-      return applyOptimisticGroupMutation((currentGroup) =>
-        applyOptimisticMemberRemoval(currentGroup, currentUserId, memberUserId),
-      )
+      await invalidateGroup()
     },
-    onError: (error, _memberUserId, context) => {
-      rollbackGroupMutation(context)
+    onError: (error) => {
       setMemberError(
         error instanceof Error
           ? error.message
           : 'Could not remove that member.',
       )
-    },
-    onSettled: async () => {
-      await invalidateGroup()
     },
   })
 
@@ -463,6 +455,60 @@ export function GroupDetailPage({
     }
 
     return `${whole}.${String(fraction).padStart(2, '0').replace(/0$/, '')}`
+  }
+
+  const formatDateInput = (value: Date) => value.toISOString().slice(0, 10)
+
+  const startExpenseEdit = (
+    expense: GroupDetail['ledgerEntries'][number] & {
+      type: 'expense'
+    },
+  ) => {
+    setEditingExpenseId(expense.id)
+    setExpenseTitle(expense.title)
+    setExpenseNotes(expense.expense.notes || '')
+    setExpenseAmount(formatMinorInput(expense.amountMinor))
+    setExpensePaidBy(expense.expense.paidByUserId)
+    setPayerAmounts(
+      Object.fromEntries(
+        expense.expense.payers.map((payer) => [
+          payer.userId,
+          formatMinorInput(payer.amountMinor),
+        ]),
+      ),
+    )
+    setLastEditedPayerUserId(null)
+    setExpenseOccurredOn(formatDateInput(expense.occurredAt))
+    setSplitMode(
+      expense.expense.splitMode === 'percentage' ? 'percentage' : 'fixed',
+    )
+    setSelectedParticipantIds(
+      expense.expense.participants.map((participant) => participant.userId),
+    )
+    setFixedShares(
+      expense.expense.splitMode === 'fixed'
+        ? Object.fromEntries(
+            expense.expense.participants.map((participant) => [
+              participant.userId,
+              formatMinorInput(participant.amountMinor),
+            ]),
+          )
+        : {},
+    )
+    setPercentageShares(
+      expense.expense.splitMode === 'percentage'
+        ? Object.fromEntries(
+            expense.expense.participants.map((participant) => [
+              participant.userId,
+              participant.percentageBasisPoints == null
+                ? ''
+                : formatMinorInput(participant.percentageBasisPoints),
+            ]),
+          )
+        : {},
+    )
+    setExpenseError(null)
+    focusSection('expense')
   }
 
   const parseDraftAmountToMinor = (value: string) => {
@@ -776,9 +822,13 @@ export function GroupDetailPage({
               )}
             >
               <CardHeader className="gap-2">
-                <CardTitle>Add an expense</CardTitle>
+                <CardTitle>
+                  {editingExpenseId ? 'Edit expense' : 'Add an expense'}
+                </CardTitle>
                 <CardDescription>
-                  Capture the spend first. Splits and balances update from here.
+                  {editingExpenseId
+                    ? 'Update the expense and the ledger will adjust right away.'
+                    : 'Capture the spend first. Splits and balances update from here.'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -786,7 +836,7 @@ export function GroupDetailPage({
                   className="grid gap-4"
                   onSubmit={(event) => {
                     event.preventDefault()
-                    createExpenseMutation.mutate({
+                    const expenseInput = {
                       title: expenseTitle,
                       notes: expenseNotes,
                       amount: expenseAmount,
@@ -797,7 +847,17 @@ export function GroupDetailPage({
                       fixedShares,
                       percentageShares,
                       occurredOn: expenseOccurredOn,
-                    })
+                    } satisfies OptimisticExpenseInput
+
+                    if (editingExpenseId) {
+                      updateExpenseMutation.mutate({
+                        expenseId: editingExpenseId,
+                        ...expenseInput,
+                      })
+                      return
+                    }
+
+                    createExpenseMutation.mutate(expenseInput)
                   }}
                 >
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1073,14 +1133,30 @@ export function GroupDetailPage({
                   ) : null}
 
                   <div className="flex justify-end">
+                    {editingExpenseId ? (
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="ghost"
+                        onClick={resetExpenseForm}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
                     <Button
                       type="submit"
                       size="lg"
-                      disabled={createExpenseMutation.isPending}
+                      disabled={
+                        createExpenseMutation.isPending ||
+                        updateExpenseMutation.isPending
+                      }
                     >
-                      {createExpenseMutation.isPending
+                      {createExpenseMutation.isPending ||
+                      updateExpenseMutation.isPending
                         ? 'Saving...'
-                        : 'Save expense'}
+                        : editingExpenseId
+                          ? 'Update expense'
+                          : 'Save expense'}
                     </Button>
                   </div>
                 </form>
@@ -1150,20 +1226,35 @@ export function GroupDetailPage({
                             </div>
                           </div>
                           {entry.canManage ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                if (entry.type === 'expense') {
-                                  deleteExpenseMutation.mutate(entry.id)
-                                } else {
-                                  deleteSettlementMutation.mutate(entry.id)
-                                }
-                              }}
-                            >
-                              <Trash2Icon className="size-4" />
-                            </Button>
+                            <>
+                              {entry.type === 'expense' ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => startExpenseEdit(entry)}
+                                >
+                                  Edit
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  if (entry.type === 'expense') {
+                                    if (editingExpenseId === entry.id) {
+                                      resetExpenseForm()
+                                    }
+                                    deleteExpenseMutation.mutate(entry.id)
+                                  } else {
+                                    deleteSettlementMutation.mutate(entry.id)
+                                  }
+                                }}
+                              >
+                                <Trash2Icon className="size-4" />
+                              </Button>
+                            </>
                           ) : null}
                         </div>
                       </div>
@@ -1265,13 +1356,7 @@ export function GroupDetailPage({
                     className="grid gap-4 md:grid-cols-2"
                     onSubmit={(event) => {
                       event.preventDefault()
-                      createSettlementMutation.mutate({
-                        fromUserId: settlementFromUserId,
-                        toUserId: settlementToUserId,
-                        amount: settlementAmount,
-                        note: settlementNote,
-                        occurredOn: settlementOccurredOn,
-                      })
+                      createSettlementMutation.mutate()
                     }}
                   >
                     <div className="space-y-2">

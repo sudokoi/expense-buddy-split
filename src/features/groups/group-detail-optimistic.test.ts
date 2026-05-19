@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   applyOptimisticExpenseCreate,
   applyOptimisticExpenseDelete,
-  applyOptimisticSettlementCreate,
+  applyOptimisticExpenseUpdate,
 } from '@/features/groups/group-detail-optimistic'
 import type { GroupDetail } from '@/features/groups/group-repository'
 
@@ -99,28 +99,50 @@ describe('group detail optimistic updates', () => {
     ])
   })
 
-  test('optimistically creates a settlement and recalculates balances', () => {
-    const updated = applyOptimisticSettlementCreate(
+  test('optimistically updates an expense and recalculates balances', () => {
+    const created = applyOptimisticExpenseCreate(
       createEmptyGroupDetail(),
       'user-1',
       {
-        fromUserId: 'user-2',
-        toUserId: 'user-1',
-        amount: '5',
-        note: 'UPI',
+        title: 'Taxi',
+        amount: '12',
+        paidByUserId: 'user-1',
+        splitMode: 'fixed',
+        participantUserIds: ['user-1', 'user-2'],
+        fixedShares: {
+          'user-1': '6',
+          'user-2': '6',
+        },
       },
     )
 
+    if (created.ledgerEntries[0]?.type !== 'expense') {
+      throw new Error('Expected an optimistic expense entry.')
+    }
+
+    const updated = applyOptimisticExpenseUpdate(created, 'user-1', {
+      expenseId: created.ledgerEntries[0].id,
+      title: 'Cab ride',
+      amount: '18',
+      paidByUserId: 'user-2',
+      splitMode: 'fixed',
+      participantUserIds: ['user-1', 'user-2'],
+      fixedShares: {
+        'user-1': '9',
+        'user-2': '9',
+      },
+    })
+
     expect(updated.ledgerEntries).toHaveLength(1)
     expect(updated.ledgerEntries[0]).toMatchObject({
-      type: 'settlement',
-      title: 'Settlement',
-      subtitle: 'Bob paid Alice · UPI',
-      amountMinor: 500,
+      type: 'expense',
+      title: 'Cab ride',
+      subtitle: 'Paid by Bob',
+      amountMinor: 1800,
     })
     expect(updated.balances).toEqual([
-      expect.objectContaining({ userId: 'user-2', balanceMinor: 500 }),
-      expect.objectContaining({ userId: 'user-1', balanceMinor: -500 }),
+      expect.objectContaining({ userId: 'user-2', balanceMinor: 900 }),
+      expect.objectContaining({ userId: 'user-1', balanceMinor: -900 }),
     ])
   })
 })
