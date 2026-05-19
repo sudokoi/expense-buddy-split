@@ -2,6 +2,8 @@
 
 BalanceBuddy is a TanStack Start web app for shared expense groups.
 
+This repository is open source under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). See `LICENSE`.
+
 The app is built around a few core ideas:
 
 - GitHub sign-in for identity
@@ -126,3 +128,7 @@ node .output/server/index.mjs
 ```
 
 For host-specific presets and deployment notes, see https://v3.nitro.build/deploy.
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`).
