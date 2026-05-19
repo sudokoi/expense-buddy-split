@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { CopyIcon, LinkIcon, ReceiptIndianRupeeIcon, RefreshCwIcon, ScaleIcon, Trash2Icon, UsersIcon } from 'lucide-react'
+import { CopyIcon, LinkIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
 import { FieldHint, FieldLabel, FormMessage, SelectInput, TextArea, TextInput } from '@/components/groups/form-primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/components/ui/toast'
 import {
   createExpense,
   createGroupInvite,
@@ -33,6 +34,7 @@ type SplitMode = 'equal' | 'fixed' | 'percentage'
 
 export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: GroupDetailPageProps) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const [renameSlug, setRenameSlug] = useState(group.slug)
   const [renameError, setRenameError] = useState<string | null>(null)
   const [inviteMessage, setInviteMessage] = useState<string | null>(null)
@@ -96,8 +98,10 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
       try {
         await navigator.clipboard.writeText(absoluteUrl)
         setInviteMessage(`Invite copied: ${absoluteUrl}`)
+        showToast('Invite link copied')
       } catch {
         setInviteMessage(`Invite created: ${absoluteUrl}`)
+        showToast('Invite link created')
       }
       await invalidateGroup()
     },
@@ -254,10 +258,14 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
     [group.members],
   )
 
+  const recentLedgerEntries = group.ledgerEntries.slice(0, 8)
+  const visibleInvites = group.invites.slice(0, 4)
+  const canRecordSettlement = group.members.length > 1
+
   return (
     <AppShell
       title={group.name}
-      description={`/${group.slug} · ${group.currencyCode} group ledger with ${group.members.length} members.`}
+      description={`/${group.slug} · ${group.members.length} ${group.members.length === 1 ? 'member' : 'members'} · ${group.currencyCode}`}
       actions={
         <>
           <Badge variant={group.role === 'owner' ? 'accent' : 'secondary'}>{group.role}</Badge>
@@ -267,74 +275,20 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
         </>
       }
     >
-      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_340px]">
         <div className="space-y-5">
           {redirectedFromSlug ? (
-            <Card className="border-accent/35 bg-accent/8">
-              <CardHeader>
-                <CardTitle>Redirected from old slug</CardTitle>
-                <CardDescription>
-                  `/{redirectedFromSlug}` now points to `/{group.slug}`. Old links keep working after owner-managed slug changes.
-                </CardDescription>
-              </CardHeader>
+            <Card size="sm" className="border-accent/35 bg-accent/8">
+              <CardContent className="py-1 text-sm text-muted-foreground">
+                `/{redirectedFromSlug}` now redirects to `/{group.slug}`.
+              </CardContent>
             </Card>
           ) : null}
 
-          <Card className="border-border/70 bg-card/70">
-            <CardHeader>
-              <div className="mb-2 flex size-11 items-center justify-center rounded-[1rem] bg-primary/18 text-primary">
-                <ReceiptIndianRupeeIcon className="size-5" />
-              </div>
-              <CardTitle>Ledger</CardTitle>
-              <CardDescription>Expenses and settle-ups share one timeline so balances stay explainable.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {group.ledgerEntries.length ? (
-                group.ledgerEntries.map((entry) => (
-                  <div key={`${entry.type}-${entry.id}`} className="rounded-[1.25rem] border border-border/70 bg-background/75 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium text-foreground">{entry.title}</div>
-                        <div className="text-sm text-muted-foreground">{entry.subtitle}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={entry.type === 'expense' ? 'outline' : 'secondary'}>{entry.type}</Badge>
-                        {entry.canManage ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              if (entry.type === 'expense') {
-                                deleteExpenseMutation.mutate(entry.id)
-                              } else {
-                                deleteSettlementMutation.mutate(entry.id)
-                              }
-                            }}
-                          >
-                            <Trash2Icon className="size-4" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-                      <span className="font-medium text-foreground">{formatMinorAmount(entry.amountMinor, entry.currencyCode)}</span>
-                      <span className="text-muted-foreground">{formatDateTime(entry.occurredAt)}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-[1.35rem] border border-dashed border-border/80 bg-background/70 p-5 text-sm leading-6 text-muted-foreground">
-                  Nothing in the ledger yet. Add your first shared expense or settle-up below.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-card/70">
-            <CardHeader>
+          <Card className="border-border/70 bg-card/75">
+            <CardHeader className="gap-2">
               <CardTitle>Add an expense</CardTitle>
-              <CardDescription>Choose who paid, who participated, and how the amount should be split.</CardDescription>
+              <CardDescription>Capture the spend first. Splits and balances update from here.</CardDescription>
             </CardHeader>
             <CardContent>
               <form
@@ -378,7 +332,10 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                 </div>
 
                 <div className="space-y-3 rounded-[1.25rem] border border-border/70 bg-background/70 p-4">
-                  <FieldLabel>Participants</FieldLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldLabel>Participants</FieldLabel>
+                    <span className="text-xs text-muted-foreground">{selectedParticipantIds.length} selected</span>
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {group.members.map((member) => {
                       const checked = selectedParticipantIds.includes(member.userId)
@@ -400,7 +357,7 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                       )
                     })}
                   </div>
-                  <FieldHint>Equal splits will divide the amount automatically across selected participants.</FieldHint>
+                  <FieldHint>Equal splits divide the amount automatically across selected participants.</FieldHint>
                 </div>
 
                 {splitMode !== 'equal' ? (
@@ -435,118 +392,200 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                   </div>
                 ) : null}
 
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="expense-notes">Notes</FieldLabel>
-                  <TextArea id="expense-notes" value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} />
-                </div>
+                <details className="rounded-[1.25rem] border border-border/70 bg-background/70 p-4 [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="list-none cursor-pointer text-sm font-medium text-foreground">Add a note</summary>
+                  <div className="mt-3 space-y-2">
+                    <FieldLabel htmlFor="expense-notes">Notes</FieldLabel>
+                    <TextArea id="expense-notes" value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} />
+                  </div>
+                </details>
 
                 {expenseError ? <FormMessage>{expenseError}</FormMessage> : null}
 
-                <Button type="submit" size="lg" disabled={createExpenseMutation.isPending}>
-                  {createExpenseMutation.isPending ? 'Saving...' : 'Save expense'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-card/70">
-            <CardHeader>
-              <CardTitle>Record a settlement</CardTitle>
-              <CardDescription>Capture direct repayments so everyone sees why the balance changed.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="grid gap-4 md:grid-cols-2"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  createSettlementMutation.mutate()
-                }}
-              >
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="settlement-from">Paid by</FieldLabel>
-                  <SelectInput id="settlement-from" value={settlementFromUserId} onChange={(event) => setSettlementFromUserId(event.target.value)}>
-                    {memberOptions.map((member) => (
-                      <option key={member.value} value={member.value}>
-                        {member.label}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="settlement-to">Received by</FieldLabel>
-                  <SelectInput id="settlement-to" value={settlementToUserId} onChange={(event) => setSettlementToUserId(event.target.value)}>
-                    {memberOptions.map((member) => (
-                      <option key={member.value} value={member.value}>
-                        {member.label}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="settlement-amount">Amount</FieldLabel>
-                  <TextInput id="settlement-amount" value={settlementAmount} onChange={(event) => setSettlementAmount(event.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <FieldLabel htmlFor="settlement-date">Date</FieldLabel>
-                  <TextInput
-                    id="settlement-date"
-                    type="date"
-                    value={settlementOccurredOn}
-                    onChange={(event) => setSettlementOccurredOn(event.target.value)}
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <FieldLabel htmlFor="settlement-note">Note</FieldLabel>
-                  <TextInput id="settlement-note" value={settlementNote} onChange={(event) => setSettlementNote(event.target.value)} />
-                </div>
-
-                {settlementError ? <FormMessage className="md:col-span-2">{settlementError}</FormMessage> : null}
-
-                <div className="md:col-span-2">
-                  <Button type="submit" size="lg" disabled={createSettlementMutation.isPending}>
-                    {createSettlementMutation.isPending ? 'Saving...' : 'Save settlement'}
+                <div className="flex justify-end">
+                  <Button type="submit" size="lg" disabled={createExpenseMutation.isPending}>
+                    {createExpenseMutation.isPending ? 'Saving...' : 'Save expense'}
                   </Button>
                 </div>
               </form>
             </CardContent>
           </Card>
+
+          <Card className="border-border/70 bg-card/70">
+            <CardHeader className="gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Recent activity</CardTitle>
+                  <CardDescription>Latest expenses and settle-ups.</CardDescription>
+                </div>
+                <div className="text-xs text-muted-foreground">{group.ledgerEntries.length ? `${group.ledgerEntries.length} total` : 'No entries yet'}</div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {recentLedgerEntries.length ? (
+                recentLedgerEntries.map((entry) => (
+                  <div key={`${entry.type}-${entry.id}`} className="rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground">{entry.title}</div>
+                        <div className="text-sm text-muted-foreground">{entry.subtitle}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-foreground">{formatMinorAmount(entry.amountMinor, entry.currencyCode)}</div>
+                          <div className="text-xs text-muted-foreground">{formatDateTime(entry.occurredAt)}</div>
+                        </div>
+                        {entry.canManage ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (entry.type === 'expense') {
+                                deleteExpenseMutation.mutate(entry.id)
+                              } else {
+                                deleteSettlementMutation.mutate(entry.id)
+                              }
+                            }}
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/70 p-5 text-sm leading-6 text-muted-foreground">
+                  No activity yet. Your first expense will show up here.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-5">
-          <Card className="border-border/70 bg-card/75">
-            <CardHeader>
-              <div className="mb-2 flex size-11 items-center justify-center rounded-[1rem] bg-primary/18 text-primary">
-                <ScaleIcon className="size-5" />
-              </div>
+          <Card size="sm" className="border-border/70 bg-card/75">
+            <CardHeader className="gap-1">
               <CardTitle>Balances</CardTitle>
-              <CardDescription>Positive means that member is owed money. Negative means they owe into the group.</CardDescription>
+              <CardDescription>Current position for each member.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3">
+            <CardContent className="grid gap-2">
               {group.balances.map((balance) => (
-                <div key={balance.userId} className="rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
-                  <div className="font-medium text-foreground">{balance.displayName}</div>
-                  <div className="mt-2 text-sm text-muted-foreground">@{balance.userLogin}</div>
-                  <div className="mt-3 text-base font-semibold text-foreground">
-                    {formatMinorAmount(balance.balanceMinor, group.currencyCode)}
+                <div key={balance.userId} className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{balance.displayName}</div>
+                    <div className="text-xs text-muted-foreground">@{balance.userLogin}</div>
                   </div>
+                  <div className="text-sm font-semibold text-foreground">{formatMinorAmount(balance.balanceMinor, group.currencyCode)}</div>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <Card className="border-border/70 bg-card/75">
-            <CardHeader>
-              <div className="mb-2 flex size-11 items-center justify-center rounded-[1rem] bg-primary/18 text-primary">
-                <UsersIcon className="size-5" />
-              </div>
-              <CardTitle>Members</CardTitle>
-              <CardDescription>Owners can rename the group slug and create reusable invite links.</CardDescription>
+          <Card size="sm" className="border-border/70 bg-card/75">
+            <CardHeader className="gap-1">
+              <CardTitle>Group</CardTitle>
+              <CardDescription>{group.role === 'owner' ? 'You can manage this group.' : 'You are participating in this group.'}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="grid gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                <span>Slug</span>
+                <span className="font-medium text-foreground">/{group.slug}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                <span>Members</span>
+                <span className="font-medium text-foreground">{group.members.length}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-2.5">
+                <span>Currency</span>
+                <span className="font-medium text-foreground">{group.currencyCode}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="list-none cursor-pointer">
+              <div className="space-y-1">
+                <div className="font-medium text-foreground">Record settlement</div>
+                <div className="text-sm text-muted-foreground">Use this when someone pays another member back directly.</div>
+              </div>
+            </summary>
+            <div className="mt-4">
+              {canRecordSettlement ? (
+                <form
+                  className="grid gap-4 md:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    createSettlementMutation.mutate()
+                  }}
+                >
+                  <div className="space-y-2">
+                    <FieldLabel htmlFor="settlement-from">Paid by</FieldLabel>
+                    <SelectInput id="settlement-from" value={settlementFromUserId} onChange={(event) => setSettlementFromUserId(event.target.value)}>
+                      {memberOptions.map((member) => (
+                        <option key={member.value} value={member.value}>
+                          {member.label}
+                        </option>
+                      ))}
+                    </SelectInput>
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel htmlFor="settlement-to">Received by</FieldLabel>
+                    <SelectInput id="settlement-to" value={settlementToUserId} onChange={(event) => setSettlementToUserId(event.target.value)}>
+                      {memberOptions.map((member) => (
+                        <option key={member.value} value={member.value}>
+                          {member.label}
+                        </option>
+                      ))}
+                    </SelectInput>
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel htmlFor="settlement-amount">Amount</FieldLabel>
+                    <TextInput id="settlement-amount" value={settlementAmount} onChange={(event) => setSettlementAmount(event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel htmlFor="settlement-date">Date</FieldLabel>
+                    <TextInput
+                      id="settlement-date"
+                      type="date"
+                      value={settlementOccurredOn}
+                      onChange={(event) => setSettlementOccurredOn(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <FieldLabel htmlFor="settlement-note">Note</FieldLabel>
+                    <TextInput id="settlement-note" value={settlementNote} onChange={(event) => setSettlementNote(event.target.value)} />
+                  </div>
+
+                  {settlementError ? <FormMessage className="md:col-span-2">{settlementError}</FormMessage> : null}
+
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button type="submit" disabled={createSettlementMutation.isPending}>
+                      {createSettlementMutation.isPending ? 'Saving...' : 'Save settlement'}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="rounded-[1rem] border border-dashed border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
+                  Add another member before recording settlements.
+                </div>
+              )}
+            </div>
+          </details>
+
+          <details className="rounded-[1.5rem] border border-border/70 bg-card/75 p-4 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="list-none cursor-pointer">
+              <div className="space-y-1">
+                <div className="font-medium text-foreground">Members and settings</div>
+                <div className="text-sm text-muted-foreground">Owner tools, invites, and member management.</div>
+              </div>
+            </summary>
+            <div className="mt-4 space-y-4">
               {group.members.map((member) => (
-                <div key={member.userId} className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-border/70 bg-background/75 px-4 py-3">
-                  <div>
-                    <div className="font-medium text-foreground">{member.displayName}</div>
+                <div key={member.userId} className="flex items-center justify-between gap-4 rounded-[1rem] border border-border/70 bg-background/75 px-3 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{member.displayName}</div>
                     <div className="text-sm text-muted-foreground">@{member.userLogin}</div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -578,7 +617,7 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
 
               {group.role === 'owner' ? (
                 <>
-                  <div className="space-y-2 pt-2">
+                  <div className="space-y-2 border-t border-border/60 pt-4">
                     <FieldLabel htmlFor="rename-group-slug">Rename slug</FieldLabel>
                     <div className="flex gap-2">
                       <TextInput id="rename-group-slug" value={renameSlug} onChange={(event) => setRenameSlug(event.target.value)} />
@@ -586,26 +625,26 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                         <RefreshCwIcon className="size-4" />
                       </Button>
                     </div>
-                    <FieldHint>Older slugs are preserved in history and cannot be reused by other groups.</FieldHint>
+                    <FieldHint>Older slugs stay reserved in history and keep redirecting.</FieldHint>
                     {renameError ? <FormMessage>{renameError}</FormMessage> : null}
                   </div>
 
-                  <div className="space-y-2 rounded-[1.2rem] border border-border/70 bg-background/75 p-4">
+                  <div className="space-y-2 rounded-[1rem] border border-border/70 bg-background/75 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-medium text-foreground">Invite link</div>
-                        <div className="text-sm text-muted-foreground">Reusable by default, expires in 7 days.</div>
+                        <div className="font-medium text-foreground">Invite links</div>
+                        <div className="text-sm text-muted-foreground">Reusable by default. New links expire in 7 days.</div>
                       </div>
                       <Button type="button" onClick={() => createInviteMutation.mutate()} disabled={createInviteMutation.isPending}>
                         <LinkIcon className="size-4" />
-                        Create invite
+                        Create
                       </Button>
                     </div>
                     {inviteError ? <FormMessage>{inviteError}</FormMessage> : null}
                     {inviteMessage ? <div className="text-sm text-muted-foreground">{inviteMessage}</div> : null}
-                    {group.invites.length ? (
+                    {visibleInvites.length ? (
                       <div className="grid gap-2 pt-2">
-                        {group.invites.slice(0, 4).map((invite) => (
+                        {visibleInvites.map((invite) => (
                           <div key={invite.id} className="flex items-center justify-between gap-2 rounded-[1rem] border border-border/60 bg-card/80 px-3 py-2 text-sm">
                             <button
                               type="button"
@@ -615,8 +654,10 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                                 try {
                                   await navigator.clipboard.writeText(absoluteUrl)
                                   setInviteMessage(`Invite copied: ${absoluteUrl}`)
+                                  showToast('Invite link copied')
                                 } catch {
                                   setInviteMessage(`Invite available: ${absoluteUrl}`)
+                                  showToast('Could not copy invite link')
                                 }
                               }}
                             >
@@ -640,8 +681,8 @@ export function GroupDetailPage({ group, redirectedFromSlug, currentUserId }: Gr
                   </div>
                 </>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </details>
         </div>
       </div>
     </AppShell>

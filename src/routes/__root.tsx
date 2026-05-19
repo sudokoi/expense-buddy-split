@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
+import { ToastProvider } from '@/components/ui/toast'
 import { defaultMetaTitle, siteConfig } from '@/lib/site'
 import type { RouterContext } from '@/router'
 
@@ -60,20 +61,22 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <div className="root isolate">{children || <Outlet />}</div>
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
-        <ReactQueryDevtools buttonPosition="bottom-left" />
-        <Scripts />
+        <ToastProvider>
+          <div className="root isolate">{children || <Outlet />}</div>
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+          <ReactQueryDevtools buttonPosition="bottom-left" />
+          <Scripts />
+        </ToastProvider>
       </body>
     </html>
   )

@@ -15,6 +15,13 @@
       "when": 1779124247338,
       "tag": "0001_rare_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779163024456,
+      "tag": "0002_overconfident_monster_badoon",
+      "breakpoints": true
     }
   ]
 }
