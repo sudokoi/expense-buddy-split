@@ -20,7 +20,10 @@ export function Card({
   )
 }
 
-export function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
+export function CardHeader({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-header"
@@ -33,13 +36,23 @@ export function CardHeader({ className, ...props }: React.ComponentProps<'div'>)
   )
 }
 
-export function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+export function CardTitle({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
   return (
-    <div data-slot="card-title" className={cn('text-base leading-snug font-medium', className)} {...props} />
+    <div
+      data-slot="card-title"
+      className={cn('text-base leading-snug font-medium', className)}
+      {...props}
+    />
   )
 }
 
-export function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
+export function CardDescription({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-description"
@@ -49,15 +62,30 @@ export function CardDescription({ className, ...props }: React.ComponentProps<'d
   )
 }
 
-export function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-content" className={cn('px-4', className)} {...props} />
+export function CardContent({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="card-content"
+      className={cn('px-4', className)}
+      {...props}
+    />
+  )
 }
 
-export function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
+export function CardFooter({
+  className,
+  ...props
+}: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-footer"
-      className={cn('flex items-center rounded-b-[1.6rem] border-t border-border/60 bg-muted/50 p-4', className)}
+      className={cn(
+        'flex items-center rounded-b-[1.6rem] border-t border-border/60 bg-muted/50 p-4',
+        className,
+      )}
       {...props}
     />
   )

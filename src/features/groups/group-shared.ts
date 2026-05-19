@@ -25,7 +25,9 @@ export function normalizeGroupSlug(input: string) {
   }
 
   if (slug.length < 3 || slug.length > 48 || !slugPattern.test(slug)) {
-    throw new Error('Use a slug between 3 and 48 characters with lowercase letters, numbers, and hyphens.')
+    throw new Error(
+      'Use a slug between 3 and 48 characters with lowercase letters, numbers, and hyphens.',
+    )
   }
 
   return slug
@@ -59,7 +61,9 @@ export function parseAmountInputToMinorUnits(input: string) {
   }
 
   const [wholePart, fractionPart = ''] = value.split('.')
-  const minorUnits = Number.parseInt(wholePart, 10) * 100 + Number.parseInt(fractionPart.padEnd(2, '0'), 10)
+  const minorUnits =
+    Number.parseInt(wholePart, 10) * 100 +
+    Number.parseInt(fractionPart.padEnd(2, '0'), 10)
 
   if (!Number.isSafeInteger(minorUnits) || minorUnits <= 0) {
     throw new Error('Amount must be greater than zero.')
@@ -76,7 +80,9 @@ export function parsePercentageInputToBasisPoints(input: string) {
   }
 
   const [wholePart, fractionPart = ''] = value.split('.')
-  const basisPoints = Number.parseInt(wholePart, 10) * 100 + Number.parseInt(fractionPart.padEnd(2, '0'), 10)
+  const basisPoints =
+    Number.parseInt(wholePart, 10) * 100 +
+    Number.parseInt(fractionPart.padEnd(2, '0'), 10)
 
   if (!Number.isSafeInteger(basisPoints) || basisPoints <= 0) {
     throw new Error('Percentages must be greater than zero.')
@@ -106,7 +112,10 @@ export function formatDateOnly(date: string | number | Date) {
   }).format(new Date(date))
 }
 
-export function distributeEqualShares(amountMinor: number, participantIds: string[]) {
+export function distributeEqualShares(
+  amountMinor: number,
+  participantIds: string[],
+) {
   if (!participantIds.length) {
     throw new Error('Select at least one participant.')
   }
@@ -136,7 +145,10 @@ export function ensureUniqueValues(values: string[], errorMessage: string) {
   return uniqueValues
 }
 
-export function buildFixedShares(amountMinor: number, valuesByUserId: Record<string, string>) {
+export function buildFixedShares(
+  amountMinor: number,
+  valuesByUserId: Record<string, string>,
+) {
   const entries = Object.entries(valuesByUserId)
   if (!entries.length) {
     throw new Error('Add at least one participant share.')
@@ -150,13 +162,18 @@ export function buildFixedShares(amountMinor: number, valuesByUserId: Record<str
 
   const total = shares.reduce((sum, share) => sum + share.amountMinor, 0)
   if (total !== amountMinor) {
-    throw new Error('Fixed participant amounts must match the total expense amount.')
+    throw new Error(
+      'Fixed participant amounts must match the total expense amount.',
+    )
   }
 
   return shares
 }
 
-export function buildPercentageShares(amountMinor: number, valuesByUserId: Record<string, string>) {
+export function buildPercentageShares(
+  amountMinor: number,
+  valuesByUserId: Record<string, string>,
+) {
   const entries = Object.entries(valuesByUserId)
   if (!entries.length) {
     throw new Error('Add at least one participant percentage.')
@@ -167,7 +184,10 @@ export function buildPercentageShares(amountMinor: number, valuesByUserId: Recor
     basisPoints: parsePercentageInputToBasisPoints(value),
   }))
 
-  const totalBasisPoints = basisPointEntries.reduce((sum, entry) => sum + entry.basisPoints, 0)
+  const totalBasisPoints = basisPointEntries.reduce(
+    (sum, entry) => sum + entry.basisPoints,
+    0,
+  )
   if (totalBasisPoints !== 10_000) {
     throw new Error('Participant percentages must add up to 100%.')
   }

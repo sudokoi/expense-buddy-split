@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 
-import { buildLedgerSnapshot, createGroupRecords, evaluateInviteState } from '@/features/groups/group-domain'
+import {
+  buildLedgerSnapshot,
+  createGroupRecords,
+  evaluateInviteState,
+} from '@/features/groups/group-domain'
 import {
   buildPercentageShares,
   buildSuggestedGroupSlug,
@@ -79,8 +83,20 @@ describe('group domain', () => {
     const snapshot = buildLedgerSnapshot({
       viewerUserId: 'user-1',
       members: [
-        { userId: 'user-1', userLogin: 'alice', displayName: 'Alice', avatarUrl: null, role: 'owner' },
-        { userId: 'user-2', userLogin: 'bob', displayName: 'Bob', avatarUrl: null, role: 'member' },
+        {
+          userId: 'user-1',
+          userLogin: 'alice',
+          displayName: 'Alice',
+          avatarUrl: null,
+          role: 'owner',
+        },
+        {
+          userId: 'user-2',
+          userLogin: 'bob',
+          displayName: 'Bob',
+          avatarUrl: null,
+          role: 'member',
+        },
       ],
       expenses: [
         {
@@ -94,8 +110,16 @@ describe('group domain', () => {
           occurredAt: new Date('2026-05-18T10:00:00.000Z'),
           createdByUserId: 'user-1',
           participants: [
-            { userId: 'user-1', amountMinor: 1500, percentageBasisPoints: null },
-            { userId: 'user-2', amountMinor: 1500, percentageBasisPoints: null },
+            {
+              userId: 'user-1',
+              amountMinor: 1500,
+              percentageBasisPoints: null,
+            },
+            {
+              userId: 'user-2',
+              amountMinor: 1500,
+              percentageBasisPoints: null,
+            },
           ],
         },
       ],

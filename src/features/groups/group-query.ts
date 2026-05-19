@@ -1,6 +1,10 @@
 import { queryOptions } from '@tanstack/react-query'
 
-import { getGroupBySlug, getGroupsDashboard, getInvitePreview } from '@/features/groups/group.functions'
+import {
+  getGroupBySlug,
+  getGroupsDashboard,
+  getInvitePreview,
+} from '@/features/groups/group.functions'
 
 export function groupsDashboardQueryOptions() {
   return queryOptions({

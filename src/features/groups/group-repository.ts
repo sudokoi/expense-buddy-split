@@ -13,7 +13,11 @@ import {
   settlements,
   users,
 } from '@/db/schema'
-import { buildLedgerSnapshot, createGroupRecords, evaluateInviteState } from '@/features/groups/group-domain'
+import {
+  buildLedgerSnapshot,
+  createGroupRecords,
+  evaluateInviteState,
+} from '@/features/groups/group-domain'
 import {
   buildSuggestedGroupSlug,
   buildFixedShares,
@@ -189,7 +193,9 @@ export async function requirePersistedUserByGitHubId(githubUserId: number) {
   return user satisfies AuthenticatedAppUser
 }
 
-export async function listGroupsForUser(userId: string): Promise<GroupSummary[]> {
+export async function listGroupsForUser(
+  userId: string,
+): Promise<GroupSummary[]> {
   const db = getDb()
   const memberCounts = alias(groupMembers, 'member_counts')
 
@@ -207,7 +213,14 @@ export async function listGroupsForUser(userId: string): Promise<GroupSummary[]>
     .innerJoin(groups, eq(groupMembers.groupId, groups.id))
     .innerJoin(memberCounts, eq(memberCounts.groupId, groups.id))
     .where(eq(groupMembers.userId, userId))
-    .groupBy(groups.id, groups.name, groups.slug, groups.currencyCode, groupMembers.role, groups.createdAt)
+    .groupBy(
+      groups.id,
+      groups.name,
+      groups.slug,
+      groups.currencyCode,
+      groupMembers.role,
+      groups.createdAt,
+    )
     .orderBy(desc(groups.updatedAt), asc(groups.name))
 
   return memberships.map((membership) => ({
@@ -220,7 +233,10 @@ async function getGroupMembership(groupId: string, userId: string) {
   const db = getDb()
 
   return db.query.groupMembers.findFirst({
-    where: and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)),
+    where: and(
+      eq(groupMembers.groupId, groupId),
+      eq(groupMembers.userId, userId),
+    ),
   })
 }
 
@@ -293,7 +309,10 @@ export async function suggestAvailableGroupSlug(name: string) {
   throw new Error('Could not generate an available group slug.')
 }
 
-export async function createGroupForUser(user: AuthenticatedAppUser, input: CreateGroupInput) {
+export async function createGroupForUser(
+  user: AuthenticatedAppUser,
+  input: CreateGroupInput,
+) {
   const db = getDb()
   const slug = normalizeGroupSlug(input.slug)
   const name = input.name.trim()
@@ -322,11 +341,16 @@ export async function createGroupForUser(user: AuthenticatedAppUser, input: Crea
   return { groupId: records.group.id, slug: records.group.slug }
 }
 
-export async function renameGroupForOwner(userId: string, input: RenameGroupInput) {
+export async function renameGroupForOwner(
+  userId: string,
+  input: RenameGroupInput,
+) {
   const db = getDb()
   const nextSlug = normalizeGroupSlug(input.nextSlug)
   const membership = await requireGroupOwner(input.groupId, userId)
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, membership.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, membership.groupId),
+  })
 
   if (!group) {
     throw new Error('Group not found.')
@@ -401,7 +425,9 @@ export async function findGroupAccessBySlug(slug: string, userId: string) {
   }
 }
 
-async function listGroupMembers(groupId: string): Promise<GroupMemberSummary[]> {
+async function listGroupMembers(
+  groupId: string,
+): Promise<GroupMemberSummary[]> {
   const db = getDb()
 
   const rows = await db
@@ -415,12 +441,18 @@ async function listGroupMembers(groupId: string): Promise<GroupMemberSummary[]> 
     .from(groupMembers)
     .innerJoin(users, eq(groupMembers.userId, users.id))
     .where(eq(groupMembers.groupId, groupId))
-    .orderBy(desc(sql`${groupMembers.role} = 'owner'`), asc(users.displayName), asc(users.userLogin))
+    .orderBy(
+      desc(sql`${groupMembers.role} = 'owner'`),
+      asc(users.displayName),
+      asc(users.userLogin),
+    )
 
   return rows
 }
 
-async function listGroupInvites(groupId: string): Promise<GroupInviteSummary[]> {
+async function listGroupInvites(
+  groupId: string,
+): Promise<GroupInviteSummary[]> {
   const db = getDb()
 
   const rows = await db.query.groupInvites.findMany({
@@ -479,10 +511,15 @@ async function getLedgerRecords(groupId: string) {
   }
 }
 
-export async function getGroupDetailForUser(groupId: string, userId: string): Promise<GroupDetail> {
+export async function getGroupDetailForUser(
+  groupId: string,
+  userId: string,
+): Promise<GroupDetail> {
   const db = getDb()
   const membership = await requireGroupMembership(groupId, userId)
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, groupId),
+  })
 
   if (!group) {
     throw new Error('Group not found.')
@@ -514,13 +551,18 @@ export async function getGroupDetailForUser(groupId: string, userId: string): Pr
   }
 }
 
-export async function createInviteForOwner(userId: string, input: CreateInviteInput) {
+export async function createInviteForOwner(
+  userId: string,
+  input: CreateInviteInput,
+) {
   const db = getDb()
 
   await requireGroupOwner(input.groupId, userId)
 
   const now = new Date()
-  const expiresAt = new Date(now.valueOf() + (input.expiresInDays ?? 7) * 24 * 60 * 60 * 1000)
+  const expiresAt = new Date(
+    now.valueOf() + (input.expiresInDays ?? 7) * 24 * 60 * 60 * 1000,
+  )
   const token = createInviteToken()
 
   await db.insert(groupInvites).values({
@@ -538,13 +580,19 @@ export async function createInviteForOwner(userId: string, input: CreateInviteIn
   return { token, shareUrl: `/join/${token}` }
 }
 
-export async function revokeInviteForOwner(userId: string, input: RevokeInviteInput) {
+export async function revokeInviteForOwner(
+  userId: string,
+  input: RevokeInviteInput,
+) {
   const db = getDb()
 
   await requireGroupOwner(input.groupId, userId)
 
   const invite = await db.query.groupInvites.findFirst({
-    where: and(eq(groupInvites.id, input.inviteId), eq(groupInvites.groupId, input.groupId)),
+    where: and(
+      eq(groupInvites.id, input.inviteId),
+      eq(groupInvites.groupId, input.groupId),
+    ),
   })
 
   if (!invite) {
@@ -568,7 +616,9 @@ export async function getInviteForUser(token: string, userId: string) {
     return null
   }
 
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, invite.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, invite.groupId),
+  })
   if (!group) {
     return null
   }
@@ -595,7 +645,10 @@ export async function getInviteForUser(token: string, userId: string) {
   }
 }
 
-export async function joinGroupViaInvite(user: AuthenticatedAppUser, input: JoinInviteInput) {
+export async function joinGroupViaInvite(
+  user: AuthenticatedAppUser,
+  input: JoinInviteInput,
+) {
   const db = getDb()
   const invite = await db.query.groupInvites.findFirst({
     where: eq(groupInvites.tokenHash, input.token),
@@ -614,12 +667,16 @@ export async function joinGroupViaInvite(user: AuthenticatedAppUser, input: Join
   }
 
   if (invite.maxUses !== null && invite.usedCount >= invite.maxUses) {
-    throw new Error('Invite link has already been used the maximum number of times.')
+    throw new Error(
+      'Invite link has already been used the maximum number of times.',
+    )
   }
 
   const existingMembership = await getGroupMembership(invite.groupId, user.id)
   if (existingMembership) {
-    const group = await db.query.groups.findFirst({ where: eq(groups.id, invite.groupId) })
+    const group = await db.query.groups.findFirst({
+      where: eq(groups.id, invite.groupId),
+    })
 
     if (!group) {
       throw new Error('Group not found.')
@@ -628,7 +685,9 @@ export async function joinGroupViaInvite(user: AuthenticatedAppUser, input: Join
     return { slug: group.slug }
   }
 
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, invite.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, invite.groupId),
+  })
 
   if (!group) {
     throw new Error('Group not found.')
@@ -654,10 +713,16 @@ export async function joinGroupViaInvite(user: AuthenticatedAppUser, input: Join
 
 async function requireUsersInGroup(groupId: string, userIds: string[]) {
   const db = getDb()
-  const uniqueUserIds = ensureUniqueValues(userIds, 'Each participant can only appear once.')
+  const uniqueUserIds = ensureUniqueValues(
+    userIds,
+    'Each participant can only appear once.',
+  )
 
   const rows = await db.query.groupMembers.findMany({
-    where: and(eq(groupMembers.groupId, groupId), inArray(groupMembers.userId, uniqueUserIds)),
+    where: and(
+      eq(groupMembers.groupId, groupId),
+      inArray(groupMembers.userId, uniqueUserIds),
+    ),
   })
 
   if (rows.length !== uniqueUserIds.length) {
@@ -667,10 +732,15 @@ async function requireUsersInGroup(groupId: string, userIds: string[]) {
   return uniqueUserIds
 }
 
-export async function createExpenseForUser(userId: string, input: CreateExpenseInput) {
+export async function createExpenseForUser(
+  userId: string,
+  input: CreateExpenseInput,
+) {
   const db = getDb()
   const membership = await requireGroupMembership(input.groupId, userId)
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, membership.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, membership.groupId),
+  })
 
   if (!group) {
     throw new Error('Group not found.')
@@ -682,8 +752,13 @@ export async function createExpenseForUser(userId: string, input: CreateExpenseI
   }
 
   const amountMinor = parseAmountInputToMinorUnits(input.amount)
-  const participantUserIds = await requireUsersInGroup(group.id, input.participantUserIds)
-  const paidByUserIds = await requireUsersInGroup(group.id, [input.paidByUserId])
+  const participantUserIds = await requireUsersInGroup(
+    group.id,
+    input.participantUserIds,
+  )
+  const paidByUserIds = await requireUsersInGroup(group.id, [
+    input.paidByUserId,
+  ])
   const occurredAt = ensureIsoDate(input.occurredOn)
 
   const shares =
@@ -727,13 +802,21 @@ export async function createExpenseForUser(userId: string, input: CreateExpenseI
       })),
     )
 
-    await tx.update(groups).set({ updatedAt: now }).where(eq(groups.id, group.id))
+    await tx
+      .update(groups)
+      .set({ updatedAt: now })
+      .where(eq(groups.id, group.id))
   })
 }
 
-export async function updateExpenseForUser(userId: string, input: UpdateExpenseInput) {
+export async function updateExpenseForUser(
+  userId: string,
+  input: UpdateExpenseInput,
+) {
   const db = getDb()
-  const expense = await db.query.expenses.findFirst({ where: eq(expenses.id, input.expenseId) })
+  const expense = await db.query.expenses.findFirst({
+    where: eq(expenses.id, input.expenseId),
+  })
 
   if (!expense || expense.groupId !== input.groupId) {
     throw new Error('Expense not found.')
@@ -744,7 +827,9 @@ export async function updateExpenseForUser(userId: string, input: UpdateExpenseI
     throw new Error('You cannot edit this expense.')
   }
 
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, expense.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, expense.groupId),
+  })
   if (!group) {
     throw new Error('Group not found.')
   }
@@ -755,8 +840,13 @@ export async function updateExpenseForUser(userId: string, input: UpdateExpenseI
   }
 
   const amountMinor = parseAmountInputToMinorUnits(input.amount)
-  const participantUserIds = await requireUsersInGroup(group.id, input.participantUserIds)
-  const paidByUserIds = await requireUsersInGroup(group.id, [input.paidByUserId])
+  const participantUserIds = await requireUsersInGroup(
+    group.id,
+    input.participantUserIds,
+  )
+  const paidByUserIds = await requireUsersInGroup(group.id, [
+    input.paidByUserId,
+  ])
   const occurredAt = ensureIsoDate(input.occurredOn)
 
   const shares =
@@ -783,7 +873,9 @@ export async function updateExpenseForUser(userId: string, input: UpdateExpenseI
       })
       .where(eq(expenses.id, expense.id))
 
-    await tx.delete(expenseParticipants).where(eq(expenseParticipants.expenseId, expense.id))
+    await tx
+      .delete(expenseParticipants)
+      .where(eq(expenseParticipants.expenseId, expense.id))
 
     await tx.insert(expenseParticipants).values(
       shares.map((share) => ({
@@ -795,13 +887,21 @@ export async function updateExpenseForUser(userId: string, input: UpdateExpenseI
       })),
     )
 
-    await tx.update(groups).set({ updatedAt: now }).where(eq(groups.id, group.id))
+    await tx
+      .update(groups)
+      .set({ updatedAt: now })
+      .where(eq(groups.id, group.id))
   })
 }
 
-export async function deleteExpenseForUser(userId: string, input: DeleteExpenseInput) {
+export async function deleteExpenseForUser(
+  userId: string,
+  input: DeleteExpenseInput,
+) {
   const db = getDb()
-  const expense = await db.query.expenses.findFirst({ where: eq(expenses.id, input.expenseId) })
+  const expense = await db.query.expenses.findFirst({
+    where: eq(expenses.id, input.expenseId),
+  })
 
   if (!expense || expense.groupId !== input.groupId) {
     throw new Error('Expense not found.')
@@ -813,22 +913,35 @@ export async function deleteExpenseForUser(userId: string, input: DeleteExpenseI
   }
 
   await db.transaction(async (tx) => {
-    await tx.delete(expenseParticipants).where(eq(expenseParticipants.expenseId, expense.id))
+    await tx
+      .delete(expenseParticipants)
+      .where(eq(expenseParticipants.expenseId, expense.id))
     await tx.delete(expenses).where(eq(expenses.id, expense.id))
-    await tx.update(groups).set({ updatedAt: new Date() }).where(eq(groups.id, expense.groupId))
+    await tx
+      .update(groups)
+      .set({ updatedAt: new Date() })
+      .where(eq(groups.id, expense.groupId))
   })
 }
 
-export async function createSettlementForUser(userId: string, input: CreateSettlementInput) {
+export async function createSettlementForUser(
+  userId: string,
+  input: CreateSettlementInput,
+) {
   const db = getDb()
   const membership = await requireGroupMembership(input.groupId, userId)
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, membership.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, membership.groupId),
+  })
 
   if (!group) {
     throw new Error('Group not found.')
   }
 
-  const [fromUserId, toUserId] = await requireUsersInGroup(group.id, [input.fromUserId, input.toUserId])
+  const [fromUserId, toUserId] = await requireUsersInGroup(group.id, [
+    input.fromUserId,
+    input.toUserId,
+  ])
   if (fromUserId === toUserId) {
     throw new Error('Choose two different members for a settlement.')
   }
@@ -851,13 +964,21 @@ export async function createSettlementForUser(userId: string, input: CreateSettl
       createdAt: now,
     })
 
-    await tx.update(groups).set({ updatedAt: now }).where(eq(groups.id, group.id))
+    await tx
+      .update(groups)
+      .set({ updatedAt: now })
+      .where(eq(groups.id, group.id))
   })
 }
 
-export async function updateSettlementForUser(userId: string, input: UpdateSettlementInput) {
+export async function updateSettlementForUser(
+  userId: string,
+  input: UpdateSettlementInput,
+) {
   const db = getDb()
-  const settlement = await db.query.settlements.findFirst({ where: eq(settlements.id, input.settlementId) })
+  const settlement = await db.query.settlements.findFirst({
+    where: eq(settlements.id, input.settlementId),
+  })
 
   if (!settlement || settlement.groupId !== input.groupId) {
     throw new Error('Settlement not found.')
@@ -868,12 +989,17 @@ export async function updateSettlementForUser(userId: string, input: UpdateSettl
     throw new Error('You cannot edit this settlement.')
   }
 
-  const group = await db.query.groups.findFirst({ where: eq(groups.id, settlement.groupId) })
+  const group = await db.query.groups.findFirst({
+    where: eq(groups.id, settlement.groupId),
+  })
   if (!group) {
     throw new Error('Group not found.')
   }
 
-  const [fromUserId, toUserId] = await requireUsersInGroup(group.id, [input.fromUserId, input.toUserId])
+  const [fromUserId, toUserId] = await requireUsersInGroup(group.id, [
+    input.fromUserId,
+    input.toUserId,
+  ])
   if (fromUserId === toUserId) {
     throw new Error('Choose two different members for a settlement.')
   }
@@ -891,9 +1017,14 @@ export async function updateSettlementForUser(userId: string, input: UpdateSettl
     .where(eq(settlements.id, settlement.id))
 }
 
-export async function deleteSettlementForUser(userId: string, input: DeleteSettlementInput) {
+export async function deleteSettlementForUser(
+  userId: string,
+  input: DeleteSettlementInput,
+) {
   const db = getDb()
-  const settlement = await db.query.settlements.findFirst({ where: eq(settlements.id, input.settlementId) })
+  const settlement = await db.query.settlements.findFirst({
+    where: eq(settlements.id, input.settlementId),
+  })
 
   if (!settlement || settlement.groupId !== input.groupId) {
     throw new Error('Settlement not found.')
@@ -907,13 +1038,19 @@ export async function deleteSettlementForUser(userId: string, input: DeleteSettl
   await db.delete(settlements).where(eq(settlements.id, settlement.id))
 }
 
-export async function updateMemberRoleForOwner(userId: string, input: UpdateMemberRoleInput) {
+export async function updateMemberRoleForOwner(
+  userId: string,
+  input: UpdateMemberRoleInput,
+) {
   const db = getDb()
 
   await requireGroupOwner(input.groupId, userId)
 
   const membership = await db.query.groupMembers.findFirst({
-    where: and(eq(groupMembers.groupId, input.groupId), eq(groupMembers.userId, input.memberUserId)),
+    where: and(
+      eq(groupMembers.groupId, input.groupId),
+      eq(groupMembers.userId, input.memberUserId),
+    ),
   })
 
   if (!membership) {
@@ -924,16 +1061,25 @@ export async function updateMemberRoleForOwner(userId: string, input: UpdateMemb
     throw new Error('You cannot remove your own owner role.')
   }
 
-  await db.update(groupMembers).set({ role: input.role }).where(eq(groupMembers.id, membership.id))
+  await db
+    .update(groupMembers)
+    .set({ role: input.role })
+    .where(eq(groupMembers.id, membership.id))
 }
 
-export async function removeMemberForOwner(userId: string, input: RemoveMemberInput) {
+export async function removeMemberForOwner(
+  userId: string,
+  input: RemoveMemberInput,
+) {
   const db = getDb()
 
   await requireGroupOwner(input.groupId, userId)
 
   const membership = await db.query.groupMembers.findFirst({
-    where: and(eq(groupMembers.groupId, input.groupId), eq(groupMembers.userId, input.memberUserId)),
+    where: and(
+      eq(groupMembers.groupId, input.groupId),
+      eq(groupMembers.userId, input.memberUserId),
+    ),
   })
 
   if (!membership) {

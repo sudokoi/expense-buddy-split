@@ -1,10 +1,17 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
-import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
+import {
+  deleteCookie,
+  getCookie,
+  setCookie,
+} from '@tanstack/react-start/server'
 
 import { sanitizeRedirectTo } from '@/lib/redirect'
 import { env } from '@/lib/env.server'
-import { authCookieOptions, getScopedCookieName } from '@/server/cookie-settings'
+import {
+  authCookieOptions,
+  getScopedCookieName,
+} from '@/server/cookie-settings'
 
 const OAUTH_COOKIE = getScopedCookieName('balance-buddy-oauth')
 const OAUTH_TTL_SECONDS = 60 * 10
@@ -14,7 +21,9 @@ function toBase64Url(value: Buffer | string): string {
 }
 
 function sign(value: string): string {
-  return createHmac('sha256', env.sessionPassword).update(value).digest('base64url')
+  return createHmac('sha256', env.sessionPassword)
+    .update(value)
+    .digest('base64url')
 }
 
 export function issueOAuthState(redirectTo?: string) {
@@ -53,7 +62,9 @@ export function consumeOAuthState(expectedState: string) {
     return null
   }
 
-  const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+  const parsed = JSON.parse(
+    Buffer.from(payload, 'base64url').toString('utf8'),
+  ) as {
     state?: string
     redirectTo?: string
   }

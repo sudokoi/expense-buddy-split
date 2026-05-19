@@ -8,6 +8,8 @@ describe('auth errors', () => {
   })
 
   test('falls back to generic auth error', () => {
-    expect(getAuthErrorSearch(new Error('random failure'))).toEqual({ authError: 'auth_failed' })
+    expect(getAuthErrorSearch(new Error('random failure'))).toEqual({
+      authError: 'auth_failed',
+    })
   })
 })

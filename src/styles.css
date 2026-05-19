@@ -102,7 +102,11 @@ body {
     background-image 420ms ease;
   background-image:
     radial-gradient(circle at top, var(--ambient-top), transparent 30%),
-    radial-gradient(circle at bottom right, var(--ambient-bottom), transparent 24%);
+    radial-gradient(
+      circle at bottom right,
+      var(--ambient-bottom),
+      transparent 24%
+    );
 }
 
 .immersive-shell-dark {
@@ -135,9 +139,21 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top left, rgb(255 182 193 / 0.2), transparent 32%),
-    radial-gradient(circle at 80% 20%, rgb(230 230 250 / 0.44), transparent 24%),
-    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.18), transparent 26%);
+    radial-gradient(
+      circle at top left,
+      rgb(255 182 193 / 0.2),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 80% 20%,
+      rgb(230 230 250 / 0.44),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgb(152 251 152 / 0.18),
+      transparent 26%
+    );
   pointer-events: none;
   transition:
     opacity 420ms ease,
@@ -146,9 +162,21 @@ body {
 
 .immersive-shell-dark .immersive-shell__ambient {
   background:
-    radial-gradient(circle at top left, rgb(255 145 164 / 0.24), transparent 34%),
-    radial-gradient(circle at 80% 20%, rgb(212 196 251 / 0.16), transparent 28%),
-    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.12), transparent 30%);
+    radial-gradient(
+      circle at top left,
+      rgb(255 145 164 / 0.24),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 80% 20%,
+      rgb(212 196 251 / 0.16),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgb(152 251 152 / 0.12),
+      transparent 30%
+    );
 }
 
 .immersive-shell__scene {
@@ -174,8 +202,16 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top left, rgb(255 145 164 / 0.22), transparent 22%),
-    radial-gradient(circle at bottom right, rgb(152 251 152 / 0.12), transparent 22%);
+    radial-gradient(
+      circle at top left,
+      rgb(255 145 164 / 0.22),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgb(152 251 152 / 0.12),
+      transparent 22%
+    );
   pointer-events: none;
 }
 
@@ -193,7 +229,11 @@ body {
   height: min(56vw, 38rem);
   transform: translateX(-50%);
   border-radius: 9999px;
-  background: radial-gradient(circle, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0));
+  background: radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.12),
+    rgb(255 255 255 / 0)
+  );
   filter: blur(10px);
   pointer-events: none;
 }

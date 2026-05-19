@@ -5,10 +5,24 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { ArrowRightIcon, PlusIcon } from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
-import { FieldHint, FieldLabel, FormMessage, TextInput } from '@/components/groups/form-primitives'
+import {
+  FieldHint,
+  FieldLabel,
+  FormMessage,
+  TextInput,
+} from '@/components/groups/form-primitives'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { createGroup, suggestGroupSlug } from '@/features/groups/group.functions'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  createGroup,
+  suggestGroupSlug,
+} from '@/features/groups/group.functions'
 import type { GroupSummary } from '@/features/groups/group-repository'
 import { groupsDashboardQueryOptions } from '@/features/groups/group-query'
 
@@ -83,11 +97,18 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
     },
     onSuccess: async (result) => {
       resetCreateGroupForm()
-      await queryClient.invalidateQueries({ queryKey: groupsDashboardQueryOptions().queryKey })
-      await navigate({ to: '/groups/$groupSlug', params: { groupSlug: result.slug } })
+      await queryClient.invalidateQueries({
+        queryKey: groupsDashboardQueryOptions().queryKey,
+      })
+      await navigate({
+        to: '/groups/$groupSlug',
+        params: { groupSlug: result.slug },
+      })
     },
     onError: (error) => {
-      setErrorMessage(error instanceof Error ? error.message : 'Could not create the group.')
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Could not create the group.',
+      )
     },
   })
 
@@ -105,7 +126,9 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
       >
         <Card className="border-border/70 bg-card/65">
           <CardHeader className="gap-2">
-            <CardTitle>{groups.length ? 'Your groups' : 'No groups yet'}</CardTitle>
+            <CardTitle>
+              {groups.length ? 'Your groups' : 'No groups yet'}
+            </CardTitle>
             <CardDescription>
               {groups.length
                 ? 'Open a group to review balances, record entries, or invite more people.'
@@ -123,10 +146,16 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 space-y-1">
-                      <div className="truncate font-medium text-foreground">{group.name}</div>
-                      <div className="text-sm text-muted-foreground">/{group.slug}</div>
+                      <div className="truncate font-medium text-foreground">
+                        {group.name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        /{group.slug}
+                      </div>
                     </div>
-                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{group.role}</div>
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      {group.role}
+                    </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{group.memberCount} members</span>
@@ -136,8 +165,16 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
               ))
             ) : (
               <div className="rounded-[1.25rem] border border-dashed border-border/80 bg-background/65 p-6 text-sm leading-6 text-muted-foreground">
-                <p>No groups yet. Create one, share the invite link, and keep the ledger in one place.</p>
-                <Button type="button" size="sm" className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
+                <p>
+                  No groups yet. Create one, share the invite link, and keep the
+                  ledger in one place.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
                   Create your first group
                   <PlusIcon data-icon="inline-end" />
                 </Button>
@@ -147,12 +184,17 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
         </Card>
       </AppShell>
 
-      <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog.Root
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      >
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-40 bg-foreground/18 backdrop-blur-sm" />
           <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[1.6rem] border border-border/80 bg-background/95 p-5 text-foreground shadow-[0_32px_90px_rgba(74,68,88,0.22)] outline-none">
             <div className="space-y-1">
-              <Dialog.Title className="text-lg font-semibold tracking-tight">Create group</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold tracking-tight">
+                Create group
+              </Dialog.Title>
               <Dialog.Description className="text-sm leading-6 text-muted-foreground">
                 Pick a clear name and URL slug. You can rename the slug later.
               </Dialog.Description>
@@ -187,17 +229,26 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                   }}
                   placeholder="household-expenses"
                 />
-                <FieldHint>Generated from the group name. You can edit it before creating the group.</FieldHint>
+                <FieldHint>
+                  Generated from the group name. You can edit it before creating
+                  the group.
+                </FieldHint>
               </div>
 
               {errorMessage ? <FormMessage>{errorMessage}</FormMessage> : null}
 
               <div className="flex items-center justify-end gap-2 pt-2">
-                <Button type="button" variant="ghost" onClick={resetCreateGroupForm}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={resetCreateGroupForm}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={createGroupMutation.isPending}>
-                  {createGroupMutation.isPending ? 'Creating...' : 'Create group'}
+                  {createGroupMutation.isPending
+                    ? 'Creating...'
+                    : 'Create group'}
                   <ArrowRightIcon data-icon="inline-end" />
                 </Button>
               </div>

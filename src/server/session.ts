@@ -1,7 +1,10 @@
 import type { SessionConfig } from '@tanstack/react-start/server'
 
 import { env } from '@/lib/env.server'
-import { authCookieOptions, getScopedCookieName } from '@/server/cookie-settings'
+import {
+  authCookieOptions,
+  getScopedCookieName,
+} from '@/server/cookie-settings'
 
 export interface AuthSessionData {
   appUserId?: string

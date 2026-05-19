@@ -3,11 +3,21 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
 
 export function FieldLabel({ className, ...props }: ComponentProps<'label'>) {
-  return <label className={cn('text-sm font-medium text-foreground', className)} {...props} />
+  return (
+    <label
+      className={cn('text-sm font-medium text-foreground', className)}
+      {...props}
+    />
+  )
 }
 
 export function FieldHint({ className, ...props }: ComponentProps<'p'>) {
-  return <p className={cn('text-xs leading-5 text-muted-foreground', className)} {...props} />
+  return (
+    <p
+      className={cn('text-xs leading-5 text-muted-foreground', className)}
+      {...props}
+    />
+  )
 }
 
 export function TextInput({ className, ...props }: ComponentProps<'input'>) {

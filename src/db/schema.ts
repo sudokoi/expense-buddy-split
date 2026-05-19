@@ -1,5 +1,10 @@
 import { relations } from 'drizzle-orm'
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable(
   'users',
@@ -57,7 +62,9 @@ export const groupMembers = sqliteTable(
     role: text('role', { enum: ['owner', 'member'] }).notNull(),
     joinedAt: integer('joined_at', { mode: 'timestamp_ms' }).notNull(),
   },
-  (table) => [uniqueIndex('group_members_group_user_idx').on(table.groupId, table.userId)],
+  (table) => [
+    uniqueIndex('group_members_group_user_idx').on(table.groupId, table.userId),
+  ],
 )
 
 export const groupInvites = sqliteTable(
@@ -94,7 +101,9 @@ export const expenses = sqliteTable(
     paidByUserId: text('paid_by_user_id')
       .notNull()
       .references(() => users.id),
-    splitMode: text('split_mode', { enum: ['equal', 'fixed', 'percentage'] }).notNull(),
+    splitMode: text('split_mode', {
+      enum: ['equal', 'fixed', 'percentage'],
+    }).notNull(),
     occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
     createdByUserId: text('created_by_user_id')
       .notNull()
@@ -118,7 +127,12 @@ export const expenseParticipants = sqliteTable(
     amountMinor: integer('amount_minor').notNull(),
     percentageBasisPoints: integer('percentage_basis_points'),
   },
-  (table) => [uniqueIndex('expense_participants_expense_user_idx').on(table.expenseId, table.userId)],
+  (table) => [
+    uniqueIndex('expense_participants_expense_user_idx').on(
+      table.expenseId,
+      table.userId,
+    ),
+  ],
 )
 
 export const settlements = sqliteTable(
@@ -153,9 +167,15 @@ export const usersRelations = relations(users, ({ many }) => ({
   paidExpenses: many(expenses, { relationName: 'expense_paid_by_user' }),
   createdExpenses: many(expenses, { relationName: 'expense_created_by_user' }),
   expenseParticipations: many(expenseParticipants),
-  outgoingSettlements: many(settlements, { relationName: 'settlement_from_user' }),
-  incomingSettlements: many(settlements, { relationName: 'settlement_to_user' }),
-  createdSettlements: many(settlements, { relationName: 'settlement_created_by_user' }),
+  outgoingSettlements: many(settlements, {
+    relationName: 'settlement_from_user',
+  }),
+  incomingSettlements: many(settlements, {
+    relationName: 'settlement_to_user',
+  }),
+  createdSettlements: many(settlements, {
+    relationName: 'settlement_created_by_user',
+  }),
 }))
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
@@ -170,12 +190,15 @@ export const groupsRelations = relations(groups, ({ one, many }) => ({
   settlements: many(settlements),
 }))
 
-export const groupSlugHistoryRelations = relations(groupSlugHistory, ({ one }) => ({
-  group: one(groups, {
-    fields: [groupSlugHistory.groupId],
-    references: [groups.id],
+export const groupSlugHistoryRelations = relations(
+  groupSlugHistory,
+  ({ one }) => ({
+    group: one(groups, {
+      fields: [groupSlugHistory.groupId],
+      references: [groups.id],
+    }),
   }),
-}))
+)
 
 export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
   group: one(groups, {
@@ -217,16 +240,19 @@ export const expensesRelations = relations(expenses, ({ one, many }) => ({
   participants: many(expenseParticipants),
 }))
 
-export const expenseParticipantsRelations = relations(expenseParticipants, ({ one }) => ({
-  expense: one(expenses, {
-    fields: [expenseParticipants.expenseId],
-    references: [expenses.id],
+export const expenseParticipantsRelations = relations(
+  expenseParticipants,
+  ({ one }) => ({
+    expense: one(expenses, {
+      fields: [expenseParticipants.expenseId],
+      references: [expenses.id],
+    }),
+    user: one(users, {
+      fields: [expenseParticipants.userId],
+      references: [users.id],
+    }),
   }),
-  user: one(users, {
-    fields: [expenseParticipants.userId],
-    references: [users.id],
-  }),
-}))
+)
 
 export const settlementsRelations = relations(settlements, ({ one }) => ({
   group: one(groups, {

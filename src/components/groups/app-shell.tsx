@@ -12,18 +12,34 @@ interface AppShellProps {
   contentClassName?: string
 }
 
-export function AppShell({ children, title, description, actions, contentClassName }: AppShellProps) {
+export function AppShell({
+  children,
+  title,
+  description,
+  actions,
+  contentClassName,
+}: AppShellProps) {
   return (
     <ImmersiveShell
       navigation={
         <>
-          <Link to="/groups" className="transition-colors hover:text-foreground">
+          <Link
+            to="/groups"
+            className="transition-colors hover:text-foreground"
+          >
             Groups
           </Link>
-          <Link to="/" search={{ authError: undefined, redirectTo: undefined }} className="transition-colors hover:text-foreground">
+          <Link
+            to="/"
+            search={{ authError: undefined, redirectTo: undefined }}
+            className="transition-colors hover:text-foreground"
+          >
             Home
           </Link>
-          <Link to="/logout" className="transition-colors hover:text-foreground">
+          <Link
+            to="/logout"
+            className="transition-colors hover:text-foreground"
+          >
             Sign out
           </Link>
         </>
@@ -33,10 +49,16 @@ export function AppShell({ children, title, description, actions, contentClassNa
       <div className="flex w-full flex-col gap-6">
         <section className="grid gap-4 rounded-[2rem] border border-border/70 bg-card/70 p-5 shadow-[0_20px_60px_rgba(74,68,88,0.08)] backdrop-blur-xl sm:p-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">{title}</h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">{description}</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              {title}
+            </h1>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              {description}
+            </p>
           </div>
-          {actions ? <div className="flex flex-wrap gap-3 lg:justify-end">{actions}</div> : null}
+          {actions ? (
+            <div className="flex flex-wrap gap-3 lg:justify-end">{actions}</div>
+          ) : null}
         </section>
         {children}
       </div>

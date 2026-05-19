@@ -13,7 +13,10 @@ interface GitHubTokenResponse {
   error_description?: string
 }
 
-export function createGitHubAuthorizationUrl(state: string, redirectUri: string) {
+export function createGitHubAuthorizationUrl(
+  state: string,
+  redirectUri: string,
+) {
   const url = new URL('https://github.com/login/oauth/authorize')
   url.searchParams.set('client_id', env.githubClientId)
   url.searchParams.set('redirect_uri', redirectUri)
@@ -43,13 +46,19 @@ export async function exchangeGitHubCode(code: string, redirectUri: string) {
 
   const data = (await response.json()) as GitHubTokenResponse
   if (!data.access_token) {
-    throw new Error(data.error_description || data.error || 'GitHub OAuth token exchange failed')
+    throw new Error(
+      data.error_description ||
+        data.error ||
+        'GitHub OAuth token exchange failed',
+    )
   }
 
   return { accessToken: data.access_token }
 }
 
-export async function getAuthenticatedUser(accessToken: string): Promise<GitHubIdentity> {
+export async function getAuthenticatedUser(
+  accessToken: string,
+): Promise<GitHubIdentity> {
   const response = await fetch('https://api.github.com/user', {
     headers: {
       Accept: 'application/vnd.github+json',

@@ -1,4 +1,8 @@
-const requiredEnvKeys = ['SESSION_PASSWORD', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'] as const
+const requiredEnvKeys = [
+  'SESSION_PASSWORD',
+  'GITHUB_CLIENT_ID',
+  'GITHUB_CLIENT_SECRET',
+] as const
 
 type RequiredEnvKey = (typeof requiredEnvKeys)[number]
 

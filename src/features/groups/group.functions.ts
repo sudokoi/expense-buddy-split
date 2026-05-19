@@ -30,7 +30,9 @@ async function requireCurrentUser(githubUserId: number) {
 
 function requireSessionGitHubUserId(githubUserId: number | undefined) {
   if (!githubUserId) {
-    throw new Error('Your session is missing a GitHub user id. Please sign in again.')
+    throw new Error(
+      'Your session is missing a GitHub user id. Please sign in again.',
+    )
   }
 
   return githubUserId
@@ -128,7 +130,9 @@ const removeMemberSchema = z.object({
 export const getGroupsDashboard = createServerFn({ method: 'GET' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .handler(async ({ context }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return getDashboardForUser(user)
   })
 
@@ -136,7 +140,9 @@ export const createGroup = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(createGroupSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return createGroupForUser(user, data)
   })
 
@@ -151,7 +157,9 @@ export const renameGroup = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(renameGroupSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return renameGroupForOwner(user.id, data)
   })
 
@@ -159,7 +167,9 @@ export const getGroupBySlug = createServerFn({ method: 'GET' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(groupSlugSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     const access = await findGroupAccessBySlug(data.slug, user.id)
 
     if (!access) {
@@ -189,7 +199,9 @@ export const createGroupInvite = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(createInviteSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return createInviteForOwner(user.id, data)
   })
 
@@ -197,7 +209,9 @@ export const revokeGroupInvite = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(revokeInviteSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await revokeInviteForOwner(user.id, data)
     return { ok: true }
   })
@@ -206,7 +220,9 @@ export const getInvitePreview = createServerFn({ method: 'GET' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(inviteTokenSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return getInviteForUser(data.token, user.id)
   })
 
@@ -214,7 +230,9 @@ export const joinGroupInvite = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(inviteTokenSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     return joinGroupViaInvite(user, data)
   })
 
@@ -222,7 +240,9 @@ export const createExpense = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(createExpenseSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await createExpenseForUser(user.id, data)
     return { ok: true }
   })
@@ -231,7 +251,9 @@ export const updateExpense = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(updateExpenseSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await updateExpenseForUser(user.id, data)
     return { ok: true }
   })
@@ -240,7 +262,9 @@ export const deleteExpense = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(deleteExpenseSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await deleteExpenseForUser(user.id, data)
     return { ok: true }
   })
@@ -249,7 +273,9 @@ export const createSettlement = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(createSettlementSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await createSettlementForUser(user.id, data)
     return { ok: true }
   })
@@ -258,7 +284,9 @@ export const updateSettlement = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(updateSettlementSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await updateSettlementForUser(user.id, data)
     return { ok: true }
   })
@@ -267,7 +295,9 @@ export const deleteSettlement = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(deleteSettlementSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await deleteSettlementForUser(user.id, data)
     return { ok: true }
   })
@@ -276,7 +306,9 @@ export const updateMemberRole = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(updateMemberRoleSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await updateMemberRoleForOwner(user.id, data)
     return { ok: true }
   })
@@ -285,7 +317,9 @@ export const removeGroupMember = createServerFn({ method: 'POST' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(removeMemberSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     await removeMemberForOwner(user.id, data)
     return { ok: true }
   })
@@ -294,7 +328,9 @@ export const getGroupMembers = createServerFn({ method: 'GET' })
   .middleware([requireAuthenticatedSessionMiddleware])
   .inputValidator(groupIdSchema)
   .handler(async ({ context, data }) => {
-    const user = await requireCurrentUser(requireSessionGitHubUserId(context.auth.session.githubUserId))
+    const user = await requireCurrentUser(
+      requireSessionGitHubUserId(context.auth.session.githubUserId),
+    )
     const result = await getGroupDetailForUser(data.groupId, user.id)
     return result.members
   })

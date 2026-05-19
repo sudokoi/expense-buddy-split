@@ -27,7 +27,10 @@ export const beginGitHubAuthorization = createServerFn({ method: 'GET' })
     const state = issueOAuthState(data.redirectTo)
 
     throw redirect({
-      href: createGitHubAuthorizationUrl(state, `${env.appOrigin}/auth/github/callback`),
+      href: createGitHubAuthorizationUrl(
+        state,
+        `${env.appOrigin}/auth/github/callback`,
+      ),
     })
   })
 
@@ -44,7 +47,10 @@ export const completeGitHubAuthorization = createServerFn({ method: 'GET' })
       throw new Error('GitHub OAuth state verification failed')
     }
 
-    const tokenResponse = await exchangeGitHubCode(data.code, `${env.appOrigin}/auth/github/callback`)
+    const tokenResponse = await exchangeGitHubCode(
+      data.code,
+      `${env.appOrigin}/auth/github/callback`,
+    )
     const user = await getAuthenticatedUser(tokenResponse.accessToken)
     const persistedUser = await upsertGitHubUser({
       githubUserId: user.id,
@@ -73,14 +79,18 @@ export const getAuthenticatedSession = createServerFn({ method: 'GET' })
     return context.auth.session
   })
 
-export const getOptionalSession = createServerFn({ method: 'GET' }).handler(async () => {
-  const session = await useSession<AuthSessionData>(authSessionConfig)
+export const getOptionalSession = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const session = await useSession<AuthSessionData>(authSessionConfig)
 
-  return isAuthenticatedSession(session.data) ? session.data : null
-})
+    return isAuthenticatedSession(session.data) ? session.data : null
+  },
+)
 
-export const logoutGitHubSession = createServerFn({ method: 'POST' }).handler(async () => {
-  const session = await useSession<AuthSessionData>(authSessionConfig)
-  await session.clear()
-  return { redirectTo: sanitizeRedirectTo('/') }
-})
+export const logoutGitHubSession = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    const session = await useSession<AuthSessionData>(authSessionConfig)
+    await session.clear()
+    return { redirectTo: sanitizeRedirectTo('/') }
+  },
+)

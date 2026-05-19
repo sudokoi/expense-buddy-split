@@ -1,5 +1,8 @@
 import { env } from '@/lib/env.server'
-import { getScopedCookieName as getCookieName, shouldUseSecureCookies } from '@/lib/cookies'
+import {
+  getScopedCookieName as getCookieName,
+  shouldUseSecureCookies,
+} from '@/lib/cookies'
 
 const usesSecureCookies = shouldUseSecureCookies(env.appOrigin)
 

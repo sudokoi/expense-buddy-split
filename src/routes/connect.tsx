@@ -5,7 +5,10 @@ import { beginGitHubAuthorization } from '@/features/auth/github.functions'
 
 export const Route = createFileRoute('/connect')({
   validateSearch: (search) => ({
-    redirectTo: typeof search.redirectTo === 'string' ? sanitizeRedirectTo(search.redirectTo) : '/groups',
+    redirectTo:
+      typeof search.redirectTo === 'string'
+        ? sanitizeRedirectTo(search.redirectTo)
+        : '/groups',
   }),
   beforeLoad: async ({ search }) => {
     await beginGitHubAuthorization({
@@ -14,7 +17,10 @@ export const Route = createFileRoute('/connect')({
       },
     })
 
-    throw redirect({ to: '/', search: { authError: undefined, redirectTo: undefined } })
+    throw redirect({
+      to: '/',
+      search: { authError: undefined, redirectTo: undefined },
+    })
   },
   component: ConnectRoute,
 })

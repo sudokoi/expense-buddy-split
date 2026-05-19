@@ -8,12 +8,22 @@ import { getAuthErrorMessage } from '@/features/auth/errors'
 import { optionalSessionQueryOptions } from '@/features/auth/session-query'
 import { sanitizeRedirectTo } from '@/lib/redirect'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 
 export const Route = createFileRoute('/')({
   validateSearch: (search) => ({
-    authError: typeof search.authError === 'string' ? search.authError : undefined,
-    redirectTo: typeof search.redirectTo === 'string' ? sanitizeRedirectTo(search.redirectTo) : undefined,
+    authError:
+      typeof search.authError === 'string' ? search.authError : undefined,
+    redirectTo:
+      typeof search.redirectTo === 'string'
+        ? sanitizeRedirectTo(search.redirectTo)
+        : undefined,
   }),
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(optionalSessionQueryOptions())
@@ -28,7 +38,11 @@ function Home() {
   const { data: session } = useSuspenseQuery(optionalSessionQueryOptions())
 
   return (
-    <ImmersiveShell scene={<HomeScene />} navigation={null} contentClassName="max-w-5xl items-center py-12 sm:py-16">
+    <ImmersiveShell
+      scene={<HomeScene />}
+      navigation={null}
+      contentClassName="max-w-5xl items-center py-12 sm:py-16"
+    >
       <div className="flex w-full flex-col gap-8">
         <section className="home-hero-section relative flex min-h-[70vh] items-center justify-center">
           <Card className="immersive-overlay-card mx-auto w-full max-w-3xl border-white/35 bg-white/60 text-center shadow-[0_24px_90px_rgba(74,68,88,0.12)]">
@@ -37,7 +51,8 @@ function Home() {
                 Split group expenses without chasing people in spreadsheets.
               </CardTitle>
               <CardDescription className="max-w-xl text-base leading-7 sm:text-lg">
-                Create a group, add expenses, record settle-ups, and keep the balance clear for everyone involved.
+                Create a group, add expenses, record settle-ups, and keep the
+                balance clear for everyone involved.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4 px-6 pb-8 sm:px-10 sm:pb-10">
@@ -48,14 +63,24 @@ function Home() {
                     <ArrowRightIcon data-icon="inline-end" />
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    Signed in as <span className="font-medium text-foreground">{session.userLogin}</span>.
+                    Signed in as{' '}
+                    <span className="font-medium text-foreground">
+                      {session.userLogin}
+                    </span>
+                    .
                   </p>
                 </>
               ) : (
-                  <Button
-                    size="lg"
-                    render={<Link to="/connect" search={{ redirectTo: nextDestination }} preload={false} />}
-                  >
+                <Button
+                  size="lg"
+                  render={
+                    <Link
+                      to="/connect"
+                      search={{ redirectTo: nextDestination }}
+                      preload={false}
+                    />
+                  }
+                >
                   Continue with GitHub
                   <ArrowRightIcon data-icon="inline-end" />
                 </Button>

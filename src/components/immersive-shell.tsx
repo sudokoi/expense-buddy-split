@@ -39,19 +39,31 @@ export function ImmersiveShell({
             <div className="flex items-center gap-3">
               <div className="size-3 rounded-full bg-primary shadow-[0_0_30px_rgba(255,145,164,0.55)]" />
               <div>
-                <div className="text-sm font-semibold tracking-tight sm:text-base">BalanceBuddy</div>
-                <div className="text-xs text-muted-foreground">Shared groups, splits, and settle-ups</div>
+                <div className="text-sm font-semibold tracking-tight sm:text-base">
+                  BalanceBuddy
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Shared groups, splits, and settle-ups
+                </div>
               </div>
             </div>
 
             {navigation !== undefined ? (
-              <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">{navigation}</nav>
+              <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+                {navigation}
+              </nav>
             ) : (
               <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
-                <a href="#how-it-works" className="transition-colors hover:text-foreground">
+                <a
+                  href="#how-it-works"
+                  className="transition-colors hover:text-foreground"
+                >
                   How it works
                 </a>
-                <a href="#v1-scope" className="transition-colors hover:text-foreground">
+                <a
+                  href="#v1-scope"
+                  className="transition-colors hover:text-foreground"
+                >
                   V1 scope
                 </a>
               </nav>

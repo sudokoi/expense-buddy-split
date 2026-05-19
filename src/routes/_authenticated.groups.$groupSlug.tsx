@@ -1,14 +1,27 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute, notFound, redirect } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  notFound,
+  redirect,
+} from '@tanstack/react-router'
 
 import { GroupDetailPage } from '@/components/groups/group-detail-page'
 import { AppShell } from '@/components/groups/app-shell'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { groupBySlugQueryOptions } from '@/features/groups/group-query'
 
 export const Route = createFileRoute('/_authenticated/groups/$groupSlug')({
   loader: async ({ context, params }) => {
-    const data = await context.queryClient.ensureQueryData(groupBySlugQueryOptions(params.groupSlug))
+    const data = await context.queryClient.ensureQueryData(
+      groupBySlugQueryOptions(params.groupSlug),
+    )
 
     if (!data) {
       throw notFound()
@@ -19,7 +32,10 @@ export const Route = createFileRoute('/_authenticated/groups/$groupSlug')({
     }
 
     if (data.redirectedFromSlug && data.currentSlug !== params.groupSlug) {
-      throw redirect({ to: '/groups/$groupSlug', params: { groupSlug: data.currentSlug } })
+      throw redirect({
+        to: '/groups/$groupSlug',
+        params: { groupSlug: data.currentSlug },
+      })
     }
   },
   component: GroupDetailRoute,
@@ -35,12 +51,18 @@ function GroupDetailRoute() {
 
   if (data.kind === 'forbidden') {
     return (
-      <AppShell title="Group access required" description="You need to join this group before you can view its ledger.">
+      <AppShell
+        title="Group access required"
+        description="You need to join this group before you can view its ledger."
+      >
         <Card className="max-w-xl border-border/70 bg-card/75">
           <CardHeader>
-            <CardTitle>You are signed in, but not a member of this group</CardTitle>
+            <CardTitle>
+              You are signed in, but not a member of this group
+            </CardTitle>
             <CardDescription>
-              Ask an owner for an invite link, or return to your groups dashboard to create one of your own.
+              Ask an owner for an invite link, or return to your groups
+              dashboard to create one of your own.
             </CardDescription>
           </CardHeader>
           <CardContent>

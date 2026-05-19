@@ -19,26 +19,59 @@ const LINKS = [
   ['group-e', 'group-f'],
 ] as const
 
-const clusterLookup = Object.fromEntries(CLUSTERS.map((cluster) => [cluster.id, cluster]))
+const clusterLookup = Object.fromEntries(
+  CLUSTERS.map((cluster) => [cluster.id, cluster]),
+)
 
 export function HomeScene() {
   return (
-    <div className="flex h-full w-full items-center justify-center px-4 py-12 sm:px-8" aria-hidden="true">
+    <div
+      className="flex h-full w-full items-center justify-center px-4 py-12 sm:px-8"
+      aria-hidden="true"
+    >
       <div className="relative aspect-[1.2/1] w-full max-w-4xl">
-        <svg viewBox="0 0 100 84" className="h-full w-full overflow-visible" fill="none">
+        <svg
+          viewBox="0 0 100 84"
+          className="h-full w-full overflow-visible"
+          fill="none"
+        >
           <defs>
             <radialGradient id="split-scene-glow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="rgba(255,255,255,0.92)" />
               <stop offset="100%" stopColor="rgba(255,255,255,0)" />
             </radialGradient>
-            <filter id="split-scene-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <filter
+              id="split-scene-blur"
+              x="-50%"
+              y="-50%"
+              width="200%"
+              height="200%"
+            >
               <feGaussianBlur stdDeviation="3" />
             </filter>
           </defs>
 
-          <ellipse cx="50" cy="42" rx="46" ry="30" fill="rgba(216, 230, 255, 0.44)" />
-          <ellipse cx="66" cy="52" rx="20" ry="15" fill="rgba(255, 182, 193, 0.28)" />
-          <ellipse cx="34" cy="52" rx="20" ry="16" fill="rgba(152, 251, 152, 0.18)" />
+          <ellipse
+            cx="50"
+            cy="42"
+            rx="46"
+            ry="30"
+            fill="rgba(216, 230, 255, 0.44)"
+          />
+          <ellipse
+            cx="66"
+            cy="52"
+            rx="20"
+            ry="15"
+            fill="rgba(255, 182, 193, 0.28)"
+          />
+          <ellipse
+            cx="34"
+            cy="52"
+            rx="20"
+            ry="16"
+            fill="rgba(152, 251, 152, 0.18)"
+          />
 
           {LINKS.map(([from, to]) => (
             <line
@@ -54,10 +87,34 @@ export function HomeScene() {
 
           {CLUSTERS.map((cluster) => (
             <g key={cluster.id}>
-              <circle cx={cluster.x} cy={cluster.y} r={cluster.r * 2.25} fill="url(#split-scene-glow)" opacity="0.42" />
-              <circle cx={cluster.x} cy={cluster.y} r={cluster.r * 1.6} fill={cluster.color} opacity="0.24" filter="url(#split-scene-blur)" />
-              <circle cx={cluster.x} cy={cluster.y} r={cluster.r} fill={cluster.color} />
-              <circle cx={cluster.x} cy={cluster.y} r={cluster.r * 0.38} fill="#fffdf8" opacity="0.88" />
+              <circle
+                cx={cluster.x}
+                cy={cluster.y}
+                r={cluster.r * 2.25}
+                fill="url(#split-scene-glow)"
+                opacity="0.42"
+              />
+              <circle
+                cx={cluster.x}
+                cy={cluster.y}
+                r={cluster.r * 1.6}
+                fill={cluster.color}
+                opacity="0.24"
+                filter="url(#split-scene-blur)"
+              />
+              <circle
+                cx={cluster.x}
+                cy={cluster.y}
+                r={cluster.r}
+                fill={cluster.color}
+              />
+              <circle
+                cx={cluster.x}
+                cy={cluster.y}
+                r={cluster.r * 0.38}
+                fill="#fffdf8"
+                opacity="0.88"
+              />
             </g>
           ))}
 
