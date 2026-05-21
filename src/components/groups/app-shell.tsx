@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 
 import { ImmersiveShell } from '@/components/immersive-shell'
+import { groupsDashboardQueryOptions } from '@/features/groups/group-query'
 import { cn } from '@/lib/utils'
 
 interface AppShellProps {
@@ -19,12 +21,18 @@ export function AppShell({
   actions,
   contentClassName,
 }: AppShellProps) {
+  const queryClient = useQueryClient()
+  const preloadGroups = () =>
+    queryClient.prefetchQuery(groupsDashboardQueryOptions())
+
   return (
     <ImmersiveShell
       navigation={
         <>
           <Link
             to="/groups"
+            onMouseEnter={preloadGroups}
+            onFocus={preloadGroups}
             className="transition-colors hover:text-foreground"
           >
             Groups

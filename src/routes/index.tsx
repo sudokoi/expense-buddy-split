@@ -5,6 +5,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { HomeScene } from '@/components/home/home-scene'
 import { ImmersiveShell } from '@/components/immersive-shell'
 import { getAuthErrorMessage } from '@/features/auth/errors'
+import { groupsDashboardQueryOptions } from '@/features/groups/group-query'
 import { optionalSessionQueryOptions } from '@/features/auth/session-query'
 import { sanitizeRedirectTo } from '@/lib/redirect'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,10 @@ function Home() {
   const nextDestination = redirectTo ?? '/groups'
   const authErrorMessage = getAuthErrorMessage(authError)
   const { data: session } = useSuspenseQuery(optionalSessionQueryOptions())
+  const preloadGroups = Route.useRouteContext({
+    select: (context) => () =>
+      context.queryClient.prefetchQuery(groupsDashboardQueryOptions()),
+  })
 
   return (
     <ImmersiveShell
@@ -58,7 +63,16 @@ function Home() {
             <CardContent className="flex flex-col items-center gap-4 px-6 pb-8 sm:px-10 sm:pb-10">
               {session ? (
                 <>
-                  <Button size="lg" render={<Link to={nextDestination} />}>
+                  <Button
+                    size="lg"
+                    onMouseEnter={
+                      nextDestination === '/groups' ? preloadGroups : undefined
+                    }
+                    onFocus={
+                      nextDestination === '/groups' ? preloadGroups : undefined
+                    }
+                    render={<Link to={nextDestination} />}
+                  >
                     Open your groups
                     <ArrowRightIcon data-icon="inline-end" />
                   </Button>

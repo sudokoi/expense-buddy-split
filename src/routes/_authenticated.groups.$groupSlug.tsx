@@ -38,8 +38,31 @@ export const Route = createFileRoute('/_authenticated/groups/$groupSlug')({
       })
     }
   },
+  pendingMs: 150,
+  pendingComponent: GroupDetailPending,
   component: GroupDetailRoute,
 })
+
+function GroupDetailPending() {
+  return (
+    <AppShell
+      title="Loading group"
+      description="Fetching balances and activity."
+    >
+      <Card className="max-w-3xl border-border/70 bg-card/75">
+        <CardContent className="grid gap-3 py-6">
+          <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-64 animate-pulse rounded bg-muted/80" />
+          <div className="mt-2 grid gap-3">
+            <div className="h-24 animate-pulse rounded-[1.2rem] bg-muted/70" />
+            <div className="h-24 animate-pulse rounded-[1.2rem] bg-muted/70" />
+            <div className="h-24 animate-pulse rounded-[1.2rem] bg-muted/70" />
+          </div>
+        </CardContent>
+      </Card>
+    </AppShell>
+  )
+}
 
 function GroupDetailRoute() {
   const { groupSlug } = Route.useParams()
@@ -66,7 +89,12 @@ function GroupDetailRoute() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link to="/groups" className="text-sm font-medium text-primary">
+            <Link
+              to="/groups"
+              preload="intent"
+              preloadDelay={0}
+              className="text-sm font-medium text-primary"
+            >
               Back to groups
             </Link>
           </CardContent>

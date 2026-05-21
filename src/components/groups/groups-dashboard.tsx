@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useState } from 'react'
 import { Dialog } from '@base-ui/react/dialog'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { ArrowRightIcon, PlusIcon } from 'lucide-react'
 
 import { AppShell } from '@/components/groups/app-shell'
@@ -24,7 +24,10 @@ import {
   suggestGroupSlug,
 } from '@/features/groups/group.functions'
 import type { GroupSummary } from '@/features/groups/group-repository'
-import { groupsDashboardQueryOptions } from '@/features/groups/group-query'
+import {
+  groupBySlugQueryOptions,
+  groupsDashboardQueryOptions,
+} from '@/features/groups/group-query'
 
 interface GroupsDashboardProps {
   groups: GroupSummary[]
@@ -34,7 +37,14 @@ interface GroupsDashboardProps {
 export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const isNavigating = useRouterState({
+    select: (state) => state.status === 'pending',
+  })
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [pendingGroupSlug, setPendingGroupSlug] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false)
@@ -47,6 +57,16 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
     setSlug('')
     setIsSlugManuallyEdited(false)
     setErrorMessage(null)
+  }
+
+  useEffect(() => {
+    if (!isNavigating) {
+      setPendingGroupSlug(null)
+    }
+  }, [isNavigating, pathname])
+
+  function preloadGroup(groupSlug: string) {
+    void queryClient.prefetchQuery(groupBySlugQueryOptions(groupSlug))
   }
 
   useEffect(() => {
@@ -142,6 +162,11 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                   key={group.id}
                   to="/groups/$groupSlug"
                   params={{ groupSlug: group.slug }}
+                  onMouseEnter={() => preloadGroup(group.slug)}
+                  onFocus={() => preloadGroup(group.slug)}
+                  onClick={() => setPendingGroupSlug(group.slug)}
+                  preload="intent"
+                  preloadDelay={0}
                   className="rounded-[1.25rem] border border-border/70 bg-background/70 px-4 py-3 transition hover:border-ring/40 hover:bg-background"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -154,12 +179,19 @@ export function GroupsDashboard({ groups, userLogin }: GroupsDashboardProps) {
                       </div>
                     </div>
                     <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      {group.role}
+                      {pendingGroupSlug === group.slug && isNavigating
+                        ? 'opening'
+                        : group.role}
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{group.memberCount} members</span>
                     <span>{group.currencyCode}</span>
+                    {pendingGroupSlug === group.slug && isNavigating ? (
+                      <span className="font-medium text-foreground">
+                        Loading group...
+                      </span>
+                    ) : null}
                   </div>
                 </Link>
               ))

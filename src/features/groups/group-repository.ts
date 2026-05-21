@@ -90,6 +90,14 @@ export interface GroupDetail {
   balances: BalanceSummary[]
 }
 
+interface GroupAccessSummary {
+  groupId: string
+  currentSlug: string
+  redirectedFromSlug: string | null
+  hasAccess: boolean
+  role?: GroupMembershipRow['role']
+}
+
 interface CreateGroupInput {
   name: string
   slug: string
@@ -374,7 +382,10 @@ export async function renameGroupForOwner(
   return { slug: nextSlug }
 }
 
-export async function findGroupAccessBySlug(slug: string, userId: string) {
+export async function findGroupAccessBySlug(
+  slug: string,
+  userId: string,
+): Promise<GroupAccessSummary | null> {
   const db = getDb()
   const currentGroup = await db.query.groups.findFirst({
     where: eq(groups.slug, slug),
@@ -519,9 +530,12 @@ async function getLedgerRecords(groupId: string) {
 export async function getGroupDetailForUser(
   groupId: string,
   userId: string,
+  role?: GroupMembershipRow['role'],
 ): Promise<GroupDetail> {
   const db = getDb()
-  const membership = await requireGroupMembership(groupId, userId)
+  const membership = role
+    ? { role }
+    : await requireGroupMembership(groupId, userId)
   const group = await db.query.groups.findFirst({
     where: eq(groups.id, groupId),
   })

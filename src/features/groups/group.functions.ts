@@ -185,7 +185,11 @@ export const getGroupBySlug = createServerFn({ method: 'GET' })
       }
     }
 
-    const detail = await getGroupDetailForUser(access.groupId, user.id)
+    const detail = await getGroupDetailForUser(
+      access.groupId,
+      user.id,
+      access.role,
+    )
 
     return {
       kind: 'group' as const,

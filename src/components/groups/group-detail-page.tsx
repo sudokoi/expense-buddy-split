@@ -46,17 +46,15 @@ import {
 import {
   applyOptimisticExpenseCreate,
   applyOptimisticExpenseDelete,
-  applyOptimisticExpenseUpdate
-  
-  
+  applyOptimisticExpenseUpdate,
 } from '@/features/groups/group-detail-optimistic'
-import type {OptimisticExpenseInput, OptimisticExpenseUpdateInput} from '@/features/groups/group-detail-optimistic';
+import type {
+  OptimisticExpenseInput,
+  OptimisticExpenseUpdateInput,
+} from '@/features/groups/group-detail-optimistic'
 import type { GroupDetail } from '@/features/groups/group-repository'
-import {
-  groupBySlugQueryOptions
-  
-} from '@/features/groups/group-query'
-import type {GroupBySlugQueryData} from '@/features/groups/group-query';
+import { groupBySlugQueryOptions } from '@/features/groups/group-query'
+import type { GroupBySlugQueryData } from '@/features/groups/group-query'
 import {
   formatDateOnly,
   formatDateTime,
@@ -774,7 +772,10 @@ export function GroupDetailPage({
           <Badge variant={group.role === 'owner' ? 'accent' : 'secondary'}>
             {group.role}
           </Badge>
-          <Button variant="outline" render={<Link to="/groups" />}>
+          <Button
+            variant="outline"
+            render={<Link to="/groups" preload="intent" preloadDelay={0} />}
+          >
             Back to groups
           </Button>
         </>
